@@ -1700,6 +1700,95 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
     Boss07_Player_SubmitHits(this, play);
 }
 
+// Builds the bust's vertices for a size: each grid point is the chest surface plus `size` times its bulge, so the
+// rim stays on the chest at any size. Normals come from the neighboring points.
+static void Boss07_Player_UpdateBustVtx(f32 size) {
+    static f32 sBuiltSize = -1.0f;
+    static Vec3f sPos[MAJORA_BUST_RINGS][MAJORA_BUST_SEGS];
+    static Vec3f sNormal[MAJORA_BUST_RINGS][MAJORA_BUST_SEGS];
+    s32 side;
+    s32 i;
+    s32 j;
+    s32 k;
+
+    if (size == sBuiltSize) {
+        return;
+    }
+    sBuiltSize = size;
+
+    for (side = 0; side < 2; side++) {
+        for (i = 0; i < MAJORA_BUST_RINGS; i++) {
+            for (j = 0; j < MAJORA_BUST_SEGS; j++) {
+                MajoraBustPoint* pt = &sPlayerWrathBustGrid[side][i][j];
+
+                sPos[i][j].x = pt->x;
+                sPos[i][j].y = pt->y;
+                sPos[i][j].z = pt->surf + (size * pt->bump);
+            }
+        }
+
+        for (i = 0; i < MAJORA_BUST_RINGS; i++) {
+            for (j = 0; j < MAJORA_BUST_SEGS; j++) {
+                // The last segment repeats the first one
+                s32 jPrev = (j == 0) ? (MAJORA_BUST_SEGS - 2) : (j - 1);
+                s32 jNext = (j == MAJORA_BUST_SEGS - 1) ? 1 : (j + 1);
+                s32 iIn = (i == 0) ? 0 : (i - 1);
+                s32 iOut = (i == MAJORA_BUST_RINGS - 1) ? i : (i + 1);
+                Vec3f along;
+                Vec3f across;
+                Vec3f n;
+                f32 len;
+
+                if (i == 0) {
+                    // The tip
+                    n.x = 0.0f;
+                    n.y = 0.0f;
+                    n.z = 1.0f;
+                } else {
+                    along.x = sPos[i][jNext].x - sPos[i][jPrev].x;
+                    along.y = sPos[i][jNext].y - sPos[i][jPrev].y;
+                    along.z = sPos[i][jNext].z - sPos[i][jPrev].z;
+                    across.x = sPos[iOut][j].x - sPos[iIn][j].x;
+                    across.y = sPos[iOut][j].y - sPos[iIn][j].y;
+                    across.z = sPos[iOut][j].z - sPos[iIn][j].z;
+                    Math3D_Vec3f_Cross(&across, &along, &n);
+                    if (n.z < 0.0f) {
+                        n.x = -n.x;
+                        n.y = -n.y;
+                        n.z = -n.z;
+                    }
+                }
+                len = sqrtf(SQ(n.x) + SQ(n.y) + SQ(n.z));
+                if (len < 0.0001f) {
+                    n.x = n.y = 0.0f;
+                    n.z = len = 1.0f;
+                }
+                sNormal[i][j].x = n.x / len;
+                sNormal[i][j].y = n.y / len;
+                sNormal[i][j].z = n.z / len;
+            }
+        }
+
+        for (k = 0; k < ARRAY_COUNT(sPlayerWrathBustLayout); k++) {
+            Vtx* v = &sPlayerWrathBustVtx[side][k];
+            s32 ri = sPlayerWrathBustLayout[k][0];
+            s32 si = sPlayerWrathBustLayout[k][1];
+            MajoraBustPoint* pt = &sPlayerWrathBustGrid[side][ri][si];
+
+            v->n.ob[0] = (s16)sPos[ri][si].x;
+            v->n.ob[1] = (s16)sPos[ri][si].y;
+            v->n.ob[2] = (s16)sPos[ri][si].z;
+            v->n.flag = 0;
+            v->n.tc[0] = pt->s;
+            v->n.tc[1] = pt->t;
+            v->n.n[0] = (s8)(sNormal[ri][si].x * 127.0f);
+            v->n.n[1] = (s8)(sNormal[ri][si].y * 127.0f);
+            v->n.n[2] = (s8)(sNormal[ri][si].z * 127.0f);
+            v->n.a = 0xFF;
+        }
+    }
+}
+
 // The player Wrath's bust: two domes on her chest's eyes, the eyes at the tips (see z_boss_07_player_bust.inc).
 // Called from her limb draw right after the torso, with the torso's matrix.
 void Boss07_Player_DrawBust(Boss07* this, PlayState* play) {
@@ -1709,6 +1798,7 @@ void Boss07_Player_DrawBust(Boss07* this, PlayState* play) {
     if (!CVarGetInteger(MAJORA_PLAYER_CVAR("WrathBust"), 1) || (size <= 0.0f)) {
         return;
     }
+    Boss07_Player_UpdateBustVtx(size);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1719,7 +1809,6 @@ void Boss07_Player_DrawBust(Boss07* this, PlayState* play) {
         Matrix_Translate(sPlayerWrathBustCenters[i].x, sPlayerWrathBustCenters[i].y, sPlayerWrathBustCenters[i].z,
                          MTXMODE_APPLY);
         Matrix_Mult(&sPlayerWrathBustFrames[i], MTXMODE_APPLY);
-        Matrix_Scale(1.0f, 1.0f, size, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathBustDLs[i]);
         Matrix_Pop();
