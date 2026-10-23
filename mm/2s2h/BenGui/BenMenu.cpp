@@ -1171,6 +1171,35 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "Play as Kafei", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsKafei")
         .Options(CheckboxOptions().Tooltip("Requires scene reload to take effect."));
+    AddWidget(path, "Play as Majora", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.Enabled")
+        .Options(CheckboxOptions().Tooltip(
+            "Replaces Link with Majora's Mask from the final battle, using its moves instead of Link's.\n\n"
+            " - B (or C-Left): Spin attack. The mask flies spinning at your lock-on target, the enemy in front, "
+            "or straight ahead, and comes back.\n"
+            " - Z: Lock on as usual.\n"
+            " - A: Doors, talking, climbing and grabbing still work. No rolls or jump attacks.\n\n"
+            "Its attacks count as every damage type and go through armor and shields.\n"
+            "Link is shown in his other forms, in first person, in crawlspaces and in cutscenes."));
+    AddWidget(path, "Majora: Keep C-Button Items", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.KeepItems")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(CheckboxOptions().Tooltip(
+            "Gives the C buttons back to Link's items and masks. Needed to finish the game (Ocarina, masks, ...)."));
+    AddWidget(path, "Majora: Show Link in Cutscenes", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.ShowLinkInCutscenes")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip("Story cutscenes show Link instead of Majora."));
+    AddWidget(path, "Majora Size: %.3f", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.Scale")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(0.02f).Max(0.1f).Step(0.005f).DefaultValue(0.05f).Format("%.3f").Tooltip(
+            "Size of the mask. 0.1 is its size in the final battle."));
+    AddWidget(path, "Majora Hover Height: %.0f", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.HoverHeight")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(15.0f).Max(120.0f).Step(1.0f).DefaultValue(45.0f).Format("%.0f").Tooltip(
+            "How high the mask floats above the ground."));
     AddWidget(path, "Hyrule Warriors Styled Link", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.HyruleWarriorsStyledLink")
         .Options(CheckboxOptions().Tooltip(

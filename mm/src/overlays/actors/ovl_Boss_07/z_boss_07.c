@@ -30,6 +30,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define FLAGS                                                                                 \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
@@ -372,6 +373,9 @@ void Boss07_Top_Draw(Actor* thisx, PlayState* play2);
 void Boss07_BattleHandler_Draw(Actor* thisx, PlayState* play2);
 
 void Boss07_Reset(void);
+
+// 2S2H "Play as Majora", see z_boss_07_player.inc
+void Boss07_Player_Init(Boss07* this, PlayState* play);
 
 void Boss07_Wrath_SetupIntroCutscene(Boss07* this, PlayState* play);
 void Boss07_Wrath_IntroCutscene(Boss07* this, PlayState* play);
@@ -1360,6 +1364,12 @@ void Boss07_Init(Actor* thisx, PlayState* play2) {
     Boss07* this = (Boss07*)thisx;
     s32 i;
 
+    // 2S2H "Play as Majora"
+    if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+        Boss07_Player_Init(this, play);
+        return;
+    }
+
     if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_BATTLE_HANDLER) {
         this->actor.update = Boss07_BattleHandler_Update;
         this->actor.draw = Boss07_BattleHandler_Draw;
@@ -1586,6 +1596,11 @@ void Boss07_Destroy(Actor* thisx, PlayState* play2) {
             FALLTHROUGH;
         case MAJORA_TYPE_TOP:
             Effect_Destroy(play, this->effectIndex);
+            break;
+
+        // 2S2H "Play as Majora"
+        case MAJORA_TYPE_PLAYER:
+            Collider_DestroyCylinder(play, &this->generalCollider);
             break;
 
         default:
@@ -6559,7 +6574,12 @@ void Boss07_Mask_UpdateTentacles(Boss07* this, PlayState* play, Vec3f* base, Vec
         }
 
         tempY = pos->y + velocity->y + gravity + shapeForce.y;
-        if (tempY < 2.0f) {
+        // 2S2H "Play as Majora": the tentacles lie on whatever floor is under the player Majora, not the arena's
+        if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+            if (tempY < this->playerFloorY + 2.0f) {
+                tempY = this->playerFloorY + 2.0f;
+            }
+        } else if (tempY < 2.0f) {
             tempY = 2.0f;
         }
 
@@ -6610,6 +6630,11 @@ void Boss07_Mask_DrawTentacles(Boss07* this, PlayState* play, Vec3f* pos, Vec3f*
             thicknessScale = 0.035f;
         } else {
             thicknessScale = 0.035f - (i - (MAJORA_TENTACLE_LENGTH - 1) / 2) * 60.0f * 0.0001f;
+        }
+
+        // 2S2H "Play as Majora": thinner tentacles on a smaller mask
+        if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+            thicknessScale *= this->actor.scale.x / 0.1f;
         }
 
         Matrix_Scale(thicknessScale, thicknessScale, lengthScale * 0.01f * 2.3f, MTXMODE_APPLY);
@@ -6771,6 +6796,11 @@ void Boss07_Mask_Draw(Actor* thisx, PlayState* play2) {
     offsetVec.z = -2.0f;
     rotZ = 0.0f;
 
+    // 2S2H "Play as Majora": the tentacles grow from a smaller ring on a smaller mask
+    f32 tentacleRingScale = (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) ? (this->actor.scale.x / 0.1f) : 1.0f;
+    offsetVec.y *= tentacleRingScale;
+    offsetVec.z *= tentacleRingScale;
+
     for (i = 0; i < MAJORA_TENTACLE_COUNT; i++) {
         Matrix_Push();
         Matrix_Push();
@@ -6792,7 +6822,7 @@ void Boss07_Mask_Draw(Actor* thisx, PlayState* play2) {
 
         Boss07_Mask_DrawTentacles(this, play, this->tentacles[i].pos, this->tentacles[i].rot, lengthScale, i * 0.9f);
         rotZ += 0.5f;
-        offsetVec.y += 1.0f;
+        offsetVec.y += tentacleRingScale;
 
         Matrix_Pop();
     }
@@ -7910,3 +7940,6 @@ void Boss07_Reset(void) {
     Gfx_TextureCacheDelete(sWrathTexMask32by32);
     Gfx_TextureCacheDelete(sWrathTexMask32by64);
 }
+
+// 2S2H "Play as Majora"
+#include "z_boss_07_player.inc"

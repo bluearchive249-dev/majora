@@ -49,6 +49,52 @@ TriNorm D_801EE188;
  * Gets the damage and effect that should be applied for the collision between
  * `at` and `ac`, referring to the ac actor's damage chart if applicable.
  */
+// 2S2H "Play as Majora" (ovl_Boss_07). Majora's attacks carry every damage type at once and go through every defense.
+s32 Boss07_IsPlayerAttack(Actor* actor);
+
+static s32 CollisionCheck_IsPiercing(Collider* atCol) {
+    return (atCol != NULL) && Boss07_IsPlayerAttack(atCol->actor);
+}
+
+/**
+ * 2S2H "Play as Majora". Vanilla uses the lowest set damage flag, which for a hit carrying every type would be the
+ * Deku Nut stun. Instead pick the entry that suits Majora best among the types the target accepts: the most damage
+ * from a plain hit, then from an elemental hit (fire, ice, light, electric: only for targets that need one), then an
+ * effect without damage. Elemental entries come last so enemies don't burn, freeze or sparkle unless that's the only
+ * way to hurt them.
+ */
+static s32 CollisionCheck_GetPlayerMajoraDamageEntry(DamageTable* table, u32 flags, f32* multipliers) {
+    s32 best = -1;
+    f32 bestScore = -1.0f;
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(table->attack); i++) {
+        if (flags & (1u << i)) {
+            f32 multiplier = multipliers[table->attack[i] & 0xF];
+            u32 effect = (table->attack[i] >> 4) & 0xF;
+            s32 elemental = (effect >= 2) && (effect <= 5);
+            f32 score;
+
+            if ((multiplier > 0.0f) && !elemental) {
+                score = 300.0f + multiplier;
+            } else if (multiplier > 0.0f) {
+                score = 200.0f + multiplier;
+            } else if (effect != 0) {
+                score = 100.0f;
+            } else {
+                score = 0.0f;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = i;
+            }
+        }
+    }
+
+    return best;
+}
+
 f32 CollisionCheck_GetDamageAndEffectOnElementAC(Collider* atCol, ColliderElement* atElem, Collider* acCol,
                                                  ColliderElement* acElem, u32* effect) {
     static f32 sDamageMultipliers[] = {
@@ -71,6 +117,17 @@ f32 CollisionCheck_GetDamageAndEffectOnElementAC(Collider* atCol, ColliderElemen
             dmgFlags >>= 1;
         }
 
+        // 2S2H "Play as Majora"
+        if (CollisionCheck_IsPiercing(atCol)) {
+            s32 best = CollisionCheck_GetPlayerMajoraDamageEntry(
+                acCol->actor->colChkInfo.damageTable, atElem->atDmgInfo.dmgFlags & acElem->acDmgInfo.dmgFlags,
+                sDamageMultipliers);
+
+            if (best >= 0) {
+                i = best;
+            }
+        }
+
         // #region 2S2H - Enhancements - Damage Multiplier and Effect
         if ((GameInteractor_Should(VB_DAMAGE_MULTIPLIER, true, i, acCol->actor->colChkInfo.damageTable, &damage,
                                    sDamageMultipliers))) {
@@ -82,6 +139,11 @@ f32 CollisionCheck_GetDamageAndEffectOnElementAC(Collider* atCol, ColliderElemen
             *effect = (acCol->actor->colChkInfo.damageTable->attack[i] >> 4) & 0xF;
         }
         // #endregion
+    }
+
+    // 2S2H "Play as Majora": even targets that are immune to every type it carries take at least 1
+    if (CollisionCheck_IsPiercing(atCol) && (damage < 1.0f)) {
+        damage = 1.0f;
     }
     return damage;
 }
@@ -1683,11 +1745,14 @@ s32 CollisionCheck_SetATvsAC(struct PlayState* play, Collider* atCol, ColliderEl
             if (effect == 0) {
                 return 0;
             }
-        } else if ((CollisionCheck_ApplyElementATDefense(damage, acElem) < 1.0f) && (effect == 0)) {
+        } else if ((CollisionCheck_ApplyElementATDefense(damage, acElem) < 1.0f) && (effect == 0) &&
+                   !CollisionCheck_IsPiercing(atCol)) {
             return 0;
         }
     }
-    if ((acCol->acFlags & AC_HARD) && (atCol->actor != NULL) && (acCol->actor != NULL)) {
+    // 2S2H "Play as Majora": its attacks never bounce off hard parts (enemies throw away the whole hit then)
+    if ((acCol->acFlags & AC_HARD) && (atCol->actor != NULL) && (acCol->actor != NULL) &&
+        !CollisionCheck_IsPiercing(atCol)) {
         CollisionCheck_SetBounce(atCol, acCol);
     }
     if (!(acElem->acElemFlags & ACELEM_NO_AT_INFO)) {
@@ -3503,12 +3568,19 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
     if ((col->actor == NULL) || !(col->acFlags & AC_HIT)) {
         return;
     }
-    if (!(elem->acElemFlags & ACELEM_HIT) || (elem->acElemFlags & ACELEM_NO_DAMAGE)) {
+    if (!(elem->acElemFlags & ACELEM_HIT)) {
         return;
     }
 
     atCol = elem->acHit;
     atElem = elem->acHitElem;
+
+    // 2S2H "Play as Majora": its attacks also damage parts that normally can't be damaged
+    u8 piercing = CollisionCheck_IsPiercing(atCol);
+
+    if ((elem->acElemFlags & ACELEM_NO_DAMAGE) && !piercing) {
+        return;
+    }
 
     if ((atCol != NULL) && (atElem != NULL) && (col != NULL) && (elem != NULL)) {
         damage = CollisionCheck_GetDamageAndEffectOnElementAC(atCol, atElem, col, elem, &effect);
@@ -3520,7 +3592,7 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
                     return;
                 }
             } else {
-                finalDamage = CollisionCheck_ApplyElementATDefense(damage, elem);
+                finalDamage = piercing ? damage : CollisionCheck_ApplyElementATDefense(damage, elem);
                 if ((finalDamage < 1.0f) && (effect == 0)) {
                     return;
                 }
@@ -3529,7 +3601,8 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
         if (col->actor->colChkInfo.damageTable != NULL) {
             col->actor->colChkInfo.damageEffect = effect;
         }
-        if (!(col->acFlags & AC_HARD) || ((col->acFlags & AC_HARD) && (atElem->atDmgInfo.dmgFlags == 0x20000000))) {
+        if (!(col->acFlags & AC_HARD) || ((col->acFlags & AC_HARD) && (atElem->atDmgInfo.dmgFlags == 0x20000000)) ||
+            piercing) {
             if (col->actor->colChkInfo.damage < finalDamage) {
                 col->actor->colChkInfo.damage = finalDamage;
             }

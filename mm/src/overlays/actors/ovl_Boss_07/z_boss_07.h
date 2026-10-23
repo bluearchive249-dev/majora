@@ -31,7 +31,8 @@ typedef enum MajoraType {
     /*  30 */ MAJORA_TYPE_WRATH = 30,
     /* 100 */ MAJORA_TYPE_PROJECTILE_REMAINS = 100,
     /* 101 */ MAJORA_TYPE_PROJECTILE_INCARNATION,
-    /* 150 */ MAJORA_TYPE_BATTLE_HANDLER = 150, // handles effects, lens flare, the Remains activation cutscene, etc. 
+    /*  50 */ MAJORA_TYPE_PLAYER = 50, // 2S2H "Play as Majora": player-controlled Majora that follows Link
+    /* 150 */ MAJORA_TYPE_BATTLE_HANDLER = 150, // handles effects, lens flare, the Remains activation cutscene, etc.
     /* 180 */ MAJORA_TYPE_TOP = 180,
     /* 200 */ MAJORA_TYPE_REMAINS = 200
 } MajoraType;
@@ -295,6 +296,30 @@ typedef struct Boss07 {
     /* 0xAC10 */ UNK_TYPE1 unkAC10[4];
     /* 0xAC14 */ f32 subCamEyeModY;
     /* 0xAC18 */ UNK_TYPE1 unkAC18[8];
-} Boss07; // size = 0xAC20
+
+    // 2S2H "Play as Majora" (MAJORA_TYPE_PLAYER only)
+    u8 playerHidden;      // Link is shown instead (first person, cutscenes, other forms, ...)
+    u8 playerForm;        // see `MajoraPlayerForm`
+    s8 playerPrevInvincibility;
+    Vec3f playerAimPos;   // where attacks go: the lock-on target, the enemy in front, or straight ahead
+    Actor* playerTarget;
+    f32 playerFloorY;     // the floor under Majora, for the tentacles and effects (the arena floor is y = 0)
+} Boss07;
+
+typedef enum MajoraPlayerForm {
+    /* 0 */ MAJORA_PLAYER_FORM_MASK,
+    /* 1 */ MAJORA_PLAYER_FORM_INCARNATION,
+    /* 2 */ MAJORA_PLAYER_FORM_WRATH
+} MajoraPlayerForm;
+
+// 2S2H "Play as Majora". Every damage type except the ones that only stun, freeze or shock (enemies check those
+// flags directly and would only ever be stunned) and the shield push. Which damage-table entry is used is decided
+// in z_collision_check.c.
+#define DMG_MAJORA_PLAYER                                                                                     \
+    ((u32) ~(DMG_NORMAL_SHIELD | DMG_DEKU_NUT | DMG_ICE_ARROW | DMG_HOOKSHOT | DMG_DEKU_BUBBLE | DMG_ZORA_BARRIER))
+
+s32 Boss07_IsPlayerAttack(Actor* actor);
+s32 Boss07_Player_IsBusy(Actor* thisx);
+s32 Boss07_Player_IsHidden(Actor* thisx);
 
 #endif // Z_BOSS_07_H
