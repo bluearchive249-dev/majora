@@ -316,6 +316,7 @@ typedef struct Boss07 {
     f32 playerWalkPhase;  // Wrath's walk cycle, radians
     f32 playerWalkWeight; // how much of the walk is blended in (0 standing, 1 walking)
     f32 playerSwingSignPrev; // for Wrath's footsteps
+    f32 playerIdleWeight; // how much of Wrath's standing pose is blended in
     s16 playerBeamYaw;    // the fire beam's aim when nothing is targeted, steered with the stick
     s16 playerBeamPitch;
     // Majora's own hits: every whip segment, the fire beam. One sphere each, switched on and off every frame.
@@ -343,6 +344,11 @@ typedef enum MajoraPlayerForm {
 
 s32 Boss07_IsPlayerAttack(Actor* actor);
 s32 Boss07_Player_IsBusy(Actor* thisx);
+// Wrath's curvier figure (2s2h/Enhancements/Modes/PlayAsMajoraFigure.cpp copies her body's display lists with the
+// vertices moved by these)
+s32 Boss07_Player_GetFigureParams(f32 params[4]);
+void Boss07_Player_FigureDeformLocal(s32 mtxSlot, Vec3f* pos, Vec3f* normal);
+Gfx* PlayAsMajora_GetWrathFigureDL(s32 limbIndex);
 s32 Boss07_Player_IsHidden(Actor* thisx);
 s32 Boss07_Player_IsCarrying(Actor* thisx);
 u8 Boss07_Player_GetForm(Actor* thisx);

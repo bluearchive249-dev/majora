@@ -31,6 +31,7 @@
 #define MAJORA_PLAYER_CVAR(name) ("gModes.PlayAsMajora." name)
 
 #include "z_boss_07_player_bust.inc"
+#include "z_boss_07_player_figure.inc"
 
 // Each form's scale in the final battle; the menu sizes are fractions of these
 #define MAJORA_PLAYER_MASK_BATTLE_SCALE 0.1f
@@ -141,7 +142,6 @@ static AnimationHeader* sPlayerWrathAttackAnims[] = {
     &gMajorasWrathThreeAttackComboAnim,      // MAJORAS_WRATH_ATTACK_SUB_ACTION_THREE_HIT
     &gMajorasWrathKickAnim,                  // MAJORAS_WRATH_ATTACK_SUB_ACTION_KICK
 };
-
 
 // ------------------------------------------------------------------------------------------------
 // Queries used by the Link side and by the collision code
@@ -281,10 +281,9 @@ static s32 Boss07_Player_CanStartAttack(Boss07* this, PlayState* play) {
     if ((Message_GetState(&play->msgCtx) != TEXT_STATE_NONE) || (player->textboxBtnCooldownTimer != 0)) {
         return false;
     }
-    if (player->stateFlags1 &
-        (PLAYER_STATE1_20 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_400 |
-         PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_100000 |
-         PLAYER_STATE1_200000 | PLAYER_STATE1_20000000)) {
+    if (player->stateFlags1 & (PLAYER_STATE1_20 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_400 |
+                               PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 |
+                               PLAYER_STATE1_100000 | PLAYER_STATE1_200000 | PLAYER_STATE1_20000000)) {
         return false;
     }
     if (player->stateFlags2 & (PLAYER_STATE2_40000 | PLAYER_STATE2_USING_OCARINA)) {
@@ -728,7 +727,7 @@ static void Boss07_Player_TryChangeForm(Boss07* this, PlayState* play, Input* in
 
     if (CHECK_BTN_ALL(input->press.button, BTN_DRIGHT)) {
         newForm = (this->playerForm == MAJORA_PLAYER_FORM_INCARNATION) ? MAJORA_PLAYER_FORM_MASK
-                                                                        : MAJORA_PLAYER_FORM_INCARNATION;
+                                                                       : MAJORA_PLAYER_FORM_INCARNATION;
     } else if (CHECK_BTN_ALL(input->press.button, BTN_DLEFT)) {
         newForm = (this->playerForm == MAJORA_PLAYER_FORM_WRATH) ? MAJORA_PLAYER_FORM_MASK : MAJORA_PLAYER_FORM_WRATH;
     } else {
@@ -789,8 +788,7 @@ void Boss07_Player_Float(Boss07* this, PlayState* play) {
     Math_ApproachS(&this->actor.shape.rot.y, player->actor.shape.rot.y, 3, 0x1800);
     this->actor.world.rot.y = this->actor.shape.rot.y;
     lean = CLAMP_MAX((s16)(Boss07_Player_MovedXZ(this) * 0x200), 0x1800);
-    Math_ApproachS(&this->actor.shape.rot.x, lean + (s16)(Math_SinS(this->frameCounter * 0x1388) * 0x300), 5,
-                   0x400);
+    Math_ApproachS(&this->actor.shape.rot.x, lean + (s16)(Math_SinS(this->frameCounter * 0x1388) * 0x300), 5, 0x400);
     Math_ApproachS(&this->actor.shape.rot.z, (s16)(Math_SinS(this->frameCounter * 0x700) * 0x400), 5, 0x200);
 }
 
@@ -988,17 +986,17 @@ void Boss07_Player_FireBeam(Boss07* this, PlayState* play) {
                 if (this->subAction == MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_BEAM_ACTIVE) {
                     // Burns a trail on floors, sparks on walls
                     if (COLPOLY_GET_NORMAL(poly->normal.y) > 0.5f) {
-                        func_800AE930(&play->colCtx, Effect_GetByIndex(this->effectIndex), &hitPos, 15.0f,
-                                      Math_Atan2S(this->prevBeamTireMarkPos.x - hitPos.x,
-                                                  this->prevBeamTireMarkPos.z - hitPos.z),
-                                      poly, bgId);
+                        func_800AE930(
+                            &play->colCtx, Effect_GetByIndex(this->effectIndex), &hitPos, 15.0f,
+                            Math_Atan2S(this->prevBeamTireMarkPos.x - hitPos.x, this->prevBeamTireMarkPos.z - hitPos.z),
+                            poly, bgId);
                         this->beamTireMarkEnabled = true;
                     }
                     this->prevBeamTireMarkPos = hitPos;
 
                     if ((this->frameCounter % 6) == 0) {
-                        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_CLEAR_TAG, hitPos.x, hitPos.y, hitPos.z, 0, 0,
-                                    1, CLEAR_TAG_PARAMS(CLEAR_TAG_SMALL_LIGHT_RAYS));
+                        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_CLEAR_TAG, hitPos.x, hitPos.y, hitPos.z, 0, 0, 1,
+                                    CLEAR_TAG_PARAMS(CLEAR_TAG_SMALL_LIGHT_RAYS));
                     }
                 }
             } else {
@@ -1207,7 +1205,7 @@ void Boss07_Player_IncarnationDance(Boss07* this, PlayState* play) {
         case MAJORA_PLAYER_DANCE_SQUATTING:
             if (Animation_OnFrame(&this->skelAnime, 5.0f)) {
                 Actor_PlaySfx(&this->actor, ((this->cutsceneTimer % 2) == 0) ? NA_SE_EN_LAST2_VOICE_UAUOO1_OLD
-                                                                               : NA_SE_EN_LAST2_VOICE_UAUOO2_OLD);
+                                                                             : NA_SE_EN_LAST2_VOICE_UAUOO2_OLD);
                 Actor_PlaySfx(&this->actor, NA_SE_EN_LAST2_JUMP_OLD);
                 this->cutsceneTimer++;
             }
@@ -1295,6 +1293,9 @@ void Boss07_Player_WrathMove(Boss07* this, PlayState* play) {
     // Walks: the cycle advances with the distance covered, so the feet don't slide. One cycle is four foot swings
     // (each foot sweeps forward and back while the other one carries her).
     Math_ApproachF(&this->playerWalkWeight, (moved > 0.6f) ? 1.0f : 0.0f, 1.0f, 0.12f);
+    Math_ApproachF(&this->playerIdleWeight,
+                   ((moved <= 0.6f) && CVarGetInteger(MAJORA_PLAYER_CVAR("WrathIdlePose"), 1)) ? 1.0f : 0.0f, 1.0f,
+                   0.08f);
     if (moved > 0.01f) {
         f32 swing = MAJORA_PLAYER_WALK_FOOT_PER_BINANG * Boss07_Player_GetWalkAmplitude(moved) * this->actor.scale.x;
 
@@ -1323,14 +1324,52 @@ void Boss07_Player_WrathMove(Boss07* this, PlayState* play) {
     }
 }
 
-// Wrath's walk, on top of her idle animation (called from her limb draw)
+// Wrath's standing pose and walk, on top of her idle animation (called from her limb draw)
 void Boss07_Player_WrathWalkLimb(Boss07* this, s32 limbIndex, Vec3f* pos, Vec3s* rot) {
     f32 w = this->playerWalkWeight;
+    f32 idle = this->playerIdleWeight;
     f32 amp;
     f32 phaseL;
     f32 phaseR;
 
-    if ((this->playerForm != MAJORA_PLAYER_FORM_WRATH) || (w <= 0.0f)) {
+    if (this->playerForm != MAJORA_PLAYER_FORM_WRATH) {
+        return;
+    }
+
+    // Standing: one hand on her hip, the other raised with its whip, back straight, chin up
+    if (idle > 0.0f) {
+        s16* pose = NULL;
+
+        switch (limbIndex) {
+            case MAJORAS_WRATH_LIMB_LEFT_UPPER_ARM:
+                pose = sPlayerWrathPoseLeftUpperArm;
+                break;
+            case MAJORAS_WRATH_LIMB_LEFT_LOWER_ARM_ROOT:
+                pose = sPlayerWrathPoseLeftLowerArm;
+                break;
+            case MAJORAS_WRATH_LIMB_RIGHT_UPPER_ARM:
+                pose = sPlayerWrathPoseRightUpperArm;
+                break;
+            case MAJORAS_WRATH_LIMB_RIGHT_LOWER_ARM_ROOT:
+                pose = sPlayerWrathPoseRightLowerArm;
+                break;
+            case MAJORAS_WRATH_LIMB_TORSO:
+                pose = sPlayerWrathPoseTorso;
+                break;
+            case MAJORAS_WRATH_LIMB_HEAD:
+                pose = sPlayerWrathPoseHead;
+                break;
+            default:
+                break;
+        }
+        if (pose != NULL) {
+            rot->x += (s16)(pose[0] * idle);
+            rot->y += (s16)(pose[1] * idle);
+            rot->z += (s16)(pose[2] * idle);
+        }
+    }
+
+    if (w <= 0.0f) {
         return;
     }
 
@@ -1411,8 +1450,8 @@ static void Boss07_Player_UpdateWrathAttack(Boss07* this, PlayState* play) {
     }
     this->actor.yawTowardsPlayer = Boss07_Player_GetAimYaw(this);
 
-    this->playerCarry = (this->subAction == MAJORAS_WRATH_ATTACK_SUB_ACTION_SPIN_ATTACK) &&
-                        (this->frameCounter > 16) && (this->frameCounter <= 40);
+    this->playerCarry = (this->subAction == MAJORAS_WRATH_ATTACK_SUB_ACTION_SPIN_ATTACK) && (this->frameCounter > 16) &&
+                        (this->frameCounter <= 40);
 
     if (this->playerCarry) {
         // Link was moved here (and stopped by walls) since last frame
@@ -1631,6 +1670,12 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
     if (this->playerForm == MAJORA_PLAYER_FORM_WRATH) {
         Math_ApproachZeroF(&this->wrathLeanRotY, 1.0f, 0.02f);
         Math_ApproachZeroF(&this->wrathLeanRotX, 1.0f, 0.02f);
+
+        // The walk and the standing pose are only added while she walks or stands
+        if (this->actionFunc != Boss07_Player_WrathMove) {
+            Math_ApproachZeroF(&this->playerWalkWeight, 1.0f, 0.2f);
+            Math_ApproachZeroF(&this->playerIdleWeight, 1.0f, 0.2f);
+        }
     }
 
     Boss07_Player_ReadButtons(this, play);
@@ -1657,8 +1702,7 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
         Actor_UpdateVelocityWithoutGravity(&this->actor);
         Actor_UpdatePos(&this->actor);
         // Walls stop it
-        Actor_UpdateBgCheckInfo(play, &this->actor, 20.0f, 30.0f, 40.0f,
-                                UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_4);
+        Actor_UpdateBgCheckInfo(play, &this->actor, 20.0f, 30.0f, 40.0f, UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_4);
         this->playerFloorY = this->actor.floorHeight;
     } else {
         this->playerFloorY = player->actor.floorHeight;
@@ -1700,121 +1744,379 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
     Boss07_Player_SubmitHits(this, play);
 }
 
-// Builds the bust's vertices for a size: each grid point is the chest surface plus `size` times its bulge, so the
-// rim stays on the chest at any size. Normals come from the neighboring points.
-static void Boss07_Player_UpdateBustVtx(f32 size) {
-    static f32 sBuiltSize = -1.0f;
+// ------------------------------------------------------------------------------------------------
+// Majora's Wrath: figure, bust, glutes, hip sway
+// ------------------------------------------------------------------------------------------------
+
+// The figure's defaults; the menu sliders multiply them
+#define MAJORA_FIGURE_WAIST 0.34f // the waist's width taken in
+#define MAJORA_FIGURE_HIPS 0.32f  // the hips' width added
+#define MAJORA_FIGURE_CHEST 0.08f // the ribs taken in under the bust, with the waist
+#define MAJORA_FIGURE_BUTT 950.0f // how far her rear is pushed back (model units)
+#define MAJORA_GLUTE_SIZE 0.6f    // the glute domes' bulge, with the butt
+
+#define MAJORA_MTX_SLOT_PELVIS 0
+#define MAJORA_MTX_SLOT_TORSO 7
+
+static f32 sPlayerFigure[4]; // waist, hips, chest, butt: what `Boss07_Player_FigureDeformBody` uses
+
+// Reads the figure from the menu. Returns whether it's on (all zero when it's off, which moves nothing).
+s32 Boss07_Player_GetFigureParams(f32 params[4]) {
+    s32 enabled = CVarGetInteger(MAJORA_PLAYER_CVAR("WrathFigure"), 1);
+    s32 i;
+
+    if (enabled) {
+        f32 waist = CVarGetFloat(MAJORA_PLAYER_CVAR("WrathWaist"), 1.0f);
+
+        params[0] = MAJORA_FIGURE_WAIST * waist;
+        params[1] = MAJORA_FIGURE_HIPS * CVarGetFloat(MAJORA_PLAYER_CVAR("WrathHips"), 1.0f);
+        params[2] = MAJORA_FIGURE_CHEST * waist;
+        params[3] = MAJORA_FIGURE_BUTT * CVarGetFloat(MAJORA_PLAYER_CVAR("WrathButt"), 1.0f);
+    } else {
+        params[0] = params[1] = params[2] = params[3] = 0.0f;
+    }
+
+    for (i = 0; i < 4; i++) {
+        sPlayerFigure[i] = params[i];
+    }
+    return enabled;
+}
+
+static f32 Boss07_Player_Bell(f32 v, f32 center, f32 width) {
+    f32 d = (v - center) / width;
+
+    return expf(-SQ(d));
+}
+
+// The figure, in her body's model space in the idle pose (y up, z forward, x to her left; she's about 12000 tall):
+// the waist taken in (sideways, and a little front to back), the hips widened, her rear pushed back into two lobes.
+static void Boss07_Player_FigureDeformBody(Vec3f* p, Vec3f* out) {
+    f32 waistBell = Boss07_Player_Bell(p->y, 7850.0f, 420.0f);
+    f32 widthScale = 1.0f + (sPlayerFigure[1] * Boss07_Player_Bell(p->y, 6850.0f, 520.0f)) -
+                     (sPlayerFigure[0] * waistBell) - (sPlayerFigure[2] * Boss07_Player_Bell(p->y, 8900.0f, 450.0f));
+    f32 z = p->z;
+    f32 back = CLAMP((-700.0f - p->z) / 700.0f, 0.0f, 1.0f); // only her back half, fully past z = -1400
+
+    back = SQ(back) * (3.0f - (2.0f * back));
+    if (back > 0.0f) {
+        f32 lobe = 0.55f + (0.45f * Boss07_Player_Bell(fabsf(p->x), 750.0f, 650.0f));
+
+        z -= sPlayerFigure[3] * Boss07_Player_Bell(p->y, 6700.0f, 560.0f) * lobe * back;
+    }
+    z = 150.0f + ((z - 150.0f) * (1.0f - (0.35f * sPlayerFigure[0] * waistBell)));
+
+    out->x = p->x * widthScale;
+    out->y = p->y;
+    out->z = z;
+}
+
+static void Boss07_Player_RestToBody(MajoraRestFrame* frame, Vec3f* v, Vec3f* out, s32 isPoint) {
+    out->x = (frame->rot[0][0] * v->x) + (frame->rot[0][1] * v->y) + (frame->rot[0][2] * v->z);
+    out->y = (frame->rot[1][0] * v->x) + (frame->rot[1][1] * v->y) + (frame->rot[1][2] * v->z);
+    out->z = (frame->rot[2][0] * v->x) + (frame->rot[2][1] * v->y) + (frame->rot[2][2] * v->z);
+    if (isPoint) {
+        out->x += frame->pos[0];
+        out->y += frame->pos[1];
+        out->z += frame->pos[2];
+    }
+}
+
+static void Boss07_Player_BodyToRest(MajoraRestFrame* frame, Vec3f* v, Vec3f* out, s32 isPoint) {
+    Vec3f d = *v;
+
+    if (isPoint) {
+        d.x -= frame->pos[0];
+        d.y -= frame->pos[1];
+        d.z -= frame->pos[2];
+    }
+    out->x = (frame->rot[0][0] * d.x) + (frame->rot[1][0] * d.y) + (frame->rot[2][0] * d.z);
+    out->y = (frame->rot[0][1] * d.x) + (frame->rot[1][1] * d.y) + (frame->rot[2][1] * d.z);
+    out->z = (frame->rot[0][2] * d.x) + (frame->rot[1][2] * d.y) + (frame->rot[2][2] * d.z);
+}
+
+// Moves a vertex of her body by the figure. `pos` and `normal` (can be NULL) are in the space of flex matrix
+// `mtxSlot`; they go through that bone's idle pose into her body's space and back.
+void Boss07_Player_FigureDeformLocal(s32 mtxSlot, Vec3f* pos, Vec3f* normal) {
+    MajoraRestFrame* frame = &sPlayerWrathRestFrames[CLAMP(mtxSlot, 0, ARRAY_COUNT(sPlayerWrathRestFrames) - 1)];
+    Vec3f body;
+    Vec3f moved;
+
+    Boss07_Player_RestToBody(frame, pos, &body, true);
+    Boss07_Player_FigureDeformBody(&body, &moved);
+    Boss07_Player_BodyToRest(frame, &moved, pos, true);
+
+    if (normal != NULL) {
+        // Normals go through the inverse transpose of the deformation's Jacobian (its cofactors: only the
+        // direction matters). The Jacobian is measured around the point.
+        static const f32 sStep = 8.0f;
+        Vec3f col[3];
+        Vec3f n;
+        Vec3f nOut;
+        Vec3f c;
+        f32 len;
+        s32 k;
+
+        for (k = 0; k < 3; k++) {
+            Vec3f plus = body;
+            Vec3f minus = body;
+            Vec3f outPlus;
+            Vec3f outMinus;
+
+            ((f32*)&plus)[k] += sStep;
+            ((f32*)&minus)[k] -= sStep;
+            Boss07_Player_FigureDeformBody(&plus, &outPlus);
+            Boss07_Player_FigureDeformBody(&minus, &outMinus);
+            col[k].x = (outPlus.x - outMinus.x) / (2.0f * sStep);
+            col[k].y = (outPlus.y - outMinus.y) / (2.0f * sStep);
+            col[k].z = (outPlus.z - outMinus.z) / (2.0f * sStep);
+        }
+
+        Boss07_Player_RestToBody(frame, normal, &n, false);
+        nOut.x = nOut.y = nOut.z = 0.0f;
+        Math3D_Vec3f_Cross(&col[1], &col[2], &c);
+        nOut.x += c.x * n.x;
+        nOut.y += c.y * n.x;
+        nOut.z += c.z * n.x;
+        Math3D_Vec3f_Cross(&col[2], &col[0], &c);
+        nOut.x += c.x * n.y;
+        nOut.y += c.y * n.y;
+        nOut.z += c.z * n.y;
+        Math3D_Vec3f_Cross(&col[0], &col[1], &c);
+        nOut.x += c.x * n.z;
+        nOut.y += c.y * n.z;
+        nOut.z += c.z * n.z;
+
+        len = sqrtf(SQ(nOut.x) + SQ(nOut.y) + SQ(nOut.z));
+        if (len > 0.0001f) {
+            nOut.x /= len;
+            nOut.y /= len;
+            nOut.z /= len;
+            Boss07_Player_BodyToRest(frame, &nOut, normal, false);
+        }
+    }
+}
+
+// Builds a dome's vertices (a breast or a glute): each grid point is the body's surface plus `size` times its bulge,
+// so the rim stays on the body at any size. Placed in the limb's space (`center` + `frame`), then moved by the
+// figure like the rest of her body. Normals come from the neighboring points.
+static void Boss07_Player_BuildDomeVtx(MajoraBustPoint (*grid)[MAJORA_BUST_SEGS], Vec3f* center, MtxF* frame,
+                                       s32 mtxSlot, f32 size, Vtx* out) {
     static Vec3f sPos[MAJORA_BUST_RINGS][MAJORA_BUST_SEGS];
     static Vec3f sNormal[MAJORA_BUST_RINGS][MAJORA_BUST_SEGS];
-    s32 side;
+    Vec3f outward = { frame->xz, frame->yz, frame->zz }; // the dome's axis, from its rim to its tip
     s32 i;
     s32 j;
     s32 k;
 
-    if (size == sBuiltSize) {
-        return;
-    }
-    sBuiltSize = size;
+    for (i = 0; i < MAJORA_BUST_RINGS; i++) {
+        for (j = 0; j < MAJORA_BUST_SEGS; j++) {
+            MajoraBustPoint* pt = &grid[i][j];
+            f32 x = pt->x;
+            f32 y = pt->y;
+            f32 z = pt->surf + (size * pt->bump);
+            Vec3f* p = &sPos[i][j];
 
-    for (side = 0; side < 2; side++) {
-        for (i = 0; i < MAJORA_BUST_RINGS; i++) {
-            for (j = 0; j < MAJORA_BUST_SEGS; j++) {
-                MajoraBustPoint* pt = &sPlayerWrathBustGrid[side][i][j];
-
-                sPos[i][j].x = pt->x;
-                sPos[i][j].y = pt->y;
-                sPos[i][j].z = pt->surf + (size * pt->bump);
-            }
+            p->x = center->x + (frame->xx * x) + (frame->xy * y) + (frame->xz * z);
+            p->y = center->y + (frame->yx * x) + (frame->yy * y) + (frame->yz * z);
+            p->z = center->z + (frame->zx * x) + (frame->zy * y) + (frame->zz * z);
+            Boss07_Player_FigureDeformLocal(mtxSlot, p, NULL);
         }
+    }
 
-        for (i = 0; i < MAJORA_BUST_RINGS; i++) {
-            for (j = 0; j < MAJORA_BUST_SEGS; j++) {
+    for (i = 0; i < MAJORA_BUST_RINGS; i++) {
+        for (j = 0; j < MAJORA_BUST_SEGS; j++) {
+            Vec3f n;
+            f32 len;
+
+            if (i == 0) {
+                // The tip: the dome's axis, through the figure
+                f32 tipZ = grid[0][0].surf + (size * grid[0][0].bump);
+                Vec3f tip;
+
+                tip.x = center->x + (outward.x * tipZ);
+                tip.y = center->y + (outward.y * tipZ);
+                tip.z = center->z + (outward.z * tipZ);
+                n = outward;
+                Boss07_Player_FigureDeformLocal(mtxSlot, &tip, &n);
+            } else {
                 // The last segment repeats the first one
                 s32 jPrev = (j == 0) ? (MAJORA_BUST_SEGS - 2) : (j - 1);
                 s32 jNext = (j == MAJORA_BUST_SEGS - 1) ? 1 : (j + 1);
-                s32 iIn = (i == 0) ? 0 : (i - 1);
+                s32 iIn = i - 1;
                 s32 iOut = (i == MAJORA_BUST_RINGS - 1) ? i : (i + 1);
                 Vec3f along;
                 Vec3f across;
-                Vec3f n;
-                f32 len;
 
-                if (i == 0) {
-                    // The tip
-                    n.x = 0.0f;
-                    n.y = 0.0f;
-                    n.z = 1.0f;
-                } else {
-                    along.x = sPos[i][jNext].x - sPos[i][jPrev].x;
-                    along.y = sPos[i][jNext].y - sPos[i][jPrev].y;
-                    along.z = sPos[i][jNext].z - sPos[i][jPrev].z;
-                    across.x = sPos[iOut][j].x - sPos[iIn][j].x;
-                    across.y = sPos[iOut][j].y - sPos[iIn][j].y;
-                    across.z = sPos[iOut][j].z - sPos[iIn][j].z;
-                    Math3D_Vec3f_Cross(&across, &along, &n);
-                    if (n.z < 0.0f) {
-                        n.x = -n.x;
-                        n.y = -n.y;
-                        n.z = -n.z;
-                    }
+                along.x = sPos[i][jNext].x - sPos[i][jPrev].x;
+                along.y = sPos[i][jNext].y - sPos[i][jPrev].y;
+                along.z = sPos[i][jNext].z - sPos[i][jPrev].z;
+                across.x = sPos[iOut][j].x - sPos[iIn][j].x;
+                across.y = sPos[iOut][j].y - sPos[iIn][j].y;
+                across.z = sPos[iOut][j].z - sPos[iIn][j].z;
+                Math3D_Vec3f_Cross(&across, &along, &n);
+                if (((n.x * outward.x) + (n.y * outward.y) + (n.z * outward.z)) < 0.0f) {
+                    n.x = -n.x;
+                    n.y = -n.y;
+                    n.z = -n.z;
                 }
-                len = sqrtf(SQ(n.x) + SQ(n.y) + SQ(n.z));
-                if (len < 0.0001f) {
-                    n.x = n.y = 0.0f;
-                    n.z = len = 1.0f;
-                }
-                sNormal[i][j].x = n.x / len;
-                sNormal[i][j].y = n.y / len;
-                sNormal[i][j].z = n.z / len;
             }
-        }
 
-        for (k = 0; k < ARRAY_COUNT(sPlayerWrathBustLayout); k++) {
-            Vtx* v = &sPlayerWrathBustVtx[side][k];
-            s32 ri = sPlayerWrathBustLayout[k][0];
-            s32 si = sPlayerWrathBustLayout[k][1];
-            MajoraBustPoint* pt = &sPlayerWrathBustGrid[side][ri][si];
-
-            v->n.ob[0] = (s16)sPos[ri][si].x;
-            v->n.ob[1] = (s16)sPos[ri][si].y;
-            v->n.ob[2] = (s16)sPos[ri][si].z;
-            v->n.flag = 0;
-            v->n.tc[0] = pt->s;
-            v->n.tc[1] = pt->t;
-            v->n.n[0] = (s8)(sNormal[ri][si].x * 127.0f);
-            v->n.n[1] = (s8)(sNormal[ri][si].y * 127.0f);
-            v->n.n[2] = (s8)(sNormal[ri][si].z * 127.0f);
-            v->n.a = 0xFF;
+            len = sqrtf(SQ(n.x) + SQ(n.y) + SQ(n.z));
+            if (len < 0.0001f) {
+                n = outward;
+                len = 1.0f;
+            }
+            sNormal[i][j].x = n.x / len;
+            sNormal[i][j].y = n.y / len;
+            sNormal[i][j].z = n.z / len;
         }
     }
+
+    for (k = 0; k < ARRAY_COUNT(sPlayerWrathBustLayout); k++) {
+        Vtx* v = &out[k];
+        s32 ri = sPlayerWrathBustLayout[k][0];
+        s32 si = sPlayerWrathBustLayout[k][1];
+        MajoraBustPoint* pt = &grid[ri][si];
+
+        v->n.ob[0] = (s16)sPos[ri][si].x;
+        v->n.ob[1] = (s16)sPos[ri][si].y;
+        v->n.ob[2] = (s16)sPos[ri][si].z;
+        v->n.flag = 0;
+        v->n.tc[0] = pt->s;
+        v->n.tc[1] = pt->t;
+        v->n.n[0] = (s8)(sNormal[ri][si].x * 127.0f);
+        v->n.n[1] = (s8)(sNormal[ri][si].y * 127.0f);
+        v->n.n[2] = (s8)(sNormal[ri][si].z * 127.0f);
+        v->n.a = 0xFF;
+    }
+}
+
+static s32 Boss07_Player_FigureChanged(f32 figure[4], f32 built[4]) {
+    s32 changed = false;
+    s32 i;
+
+    for (i = 0; i < 4; i++) {
+        if (figure[i] != built[i]) {
+            changed = true;
+        }
+        built[i] = figure[i];
+    }
+    return changed;
 }
 
 // The player Wrath's bust: two domes on her chest's eyes, the eyes at the tips (see z_boss_07_player_bust.inc).
 // Called from her limb draw right after the torso, with the torso's matrix.
 void Boss07_Player_DrawBust(Boss07* this, PlayState* play) {
+    static f32 sBuiltSize = -1.0f;
+    static f32 sBuiltFigure[4] = { -1.0f, -1.0f, -1.0f, -1.0f };
     f32 size = CVarGetFloat(MAJORA_PLAYER_CVAR("WrathBustSize"), 0.65f);
+    f32 figure[4];
     s32 i;
 
     if (!CVarGetInteger(MAJORA_PLAYER_CVAR("WrathBust"), 1) || (size <= 0.0f)) {
         return;
     }
-    Boss07_Player_UpdateBustVtx(size);
+
+    Boss07_Player_GetFigureParams(figure);
+    if (Boss07_Player_FigureChanged(figure, sBuiltFigure) || (size != sBuiltSize)) {
+        sBuiltSize = size;
+        for (i = 0; i < ARRAY_COUNT(sPlayerWrathBustDLs); i++) {
+            Boss07_Player_BuildDomeVtx(sPlayerWrathBustGrid[i], &sPlayerWrathBustCenters[i], &sPlayerWrathBustFrames[i],
+                                       MAJORA_MTX_SLOT_TORSO, size, sPlayerWrathBustVtx[i]);
+        }
+    }
 
     OPEN_DISPS(play->state.gfxCtx);
 
     gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathBustMaterialDL);
-
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     for (i = 0; i < ARRAY_COUNT(sPlayerWrathBustDLs); i++) {
-        Matrix_Push();
-        Matrix_Translate(sPlayerWrathBustCenters[i].x, sPlayerWrathBustCenters[i].y, sPlayerWrathBustCenters[i].z,
-                         MTXMODE_APPLY);
-        Matrix_Mult(&sPlayerWrathBustFrames[i], MTXMODE_APPLY);
-        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathBustDLs[i]);
-        Matrix_Pop();
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Her glutes: two rounder domes on the back of her pelvis, with the pelvis's matrix (and its sway). They bounce a
+// little as she walks, each with its own leg.
+static void Boss07_Player_DrawGlutes(Boss07* this, PlayState* play) {
+    static f32 sBuiltSize[2] = { -1.0f, -1.0f };
+    static f32 sBuiltFigure[4] = { -1.0f, -1.0f, -1.0f, -1.0f };
+    f32 figure[4];
+    f32 base;
+    f32 bounce;
+    s32 rebuildAll;
+    s32 i;
+
+    if (!Boss07_Player_GetFigureParams(figure) || (figure[3] <= 0.0f)) {
+        return;
+    }
+    base = MAJORA_GLUTE_SIZE * (figure[3] / MAJORA_FIGURE_BUTT);
+    bounce = 0.1f * this->playerWalkWeight * (Boss07_Player_GetWalkAmplitude(this->actor.speed) / 0x900) *
+             CVarGetFloat(MAJORA_PLAYER_CVAR("WrathHipSway"), 1.0f);
+
+    rebuildAll = Boss07_Player_FigureChanged(figure, sBuiltFigure);
+    for (i = 0; i < ARRAY_COUNT(sPlayerWrathGluteDLs); i++) {
+        f32 size = base * (1.0f + (bounce * sinf(this->playerWalkPhase + (i * M_PIf))));
+
+        if (rebuildAll || (fabsf(size - sBuiltSize[i]) > 0.002f)) {
+            sBuiltSize[i] = size;
+            Boss07_Player_BuildDomeVtx(sPlayerWrathGluteGrid[i], &sPlayerWrathGluteCenters[i],
+                                       &sPlayerWrathGluteFrames[i], MAJORA_MTX_SLOT_PELVIS, size,
+                                       sPlayerWrathGluteVtx[i]);
+        }
+    }
+
+    OPEN_DISPS(play->state.gfxCtx);
+
+    gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathGluteMaterialDL);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    for (i = 0; i < ARRAY_COUNT(sPlayerWrathGluteDLs); i++) {
+        gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathGluteDLs[i]);
+    }
+
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// The pelvis's own transform (called from her limb draw): the hips sway as she walks and runs, turning toward the
+// leg that swings forward and rising on the leg she stands on. Standing, she cocks a hip toward the hand on it. Only
+// the pelvis turns, not her legs or torso, so her waist and the tops of her thighs follow it.
+void Boss07_Player_WrathTransformLimb(Boss07* this, PlayState* play, s32 limbIndex) {
+    MajoraRestFrame* pelvis = &sPlayerWrathRestFrames[MAJORA_MTX_SLOT_PELVIS];
+    Vec3f up;
+    Vec3f forward;
+    f32 sway;
+    f32 stride;
+    f32 yaw;
+    f32 roll;
+
+    if ((this->playerForm != MAJORA_PLAYER_FORM_WRATH) || (limbIndex != MAJORAS_WRATH_LIMB_PELVIS)) {
+        return;
+    }
+
+    sway = CVarGetFloat(MAJORA_PLAYER_CVAR("WrathHipSway"), 1.0f);
+    stride = this->playerWalkWeight * (Boss07_Player_GetWalkAmplitude(this->actor.speed) / 0x900);
+    yaw = -0x380 * sway * stride * sinf(this->playerWalkPhase);
+    roll = -0x2C0 * sway * stride * cosf(this->playerWalkPhase);
+    yaw += 0x200 * this->playerIdleWeight;
+    roll += 0x400 * this->playerIdleWeight;
+
+    // Her body's up and forward in the pelvis's own space
+    up.x = pelvis->rot[1][0];
+    up.y = pelvis->rot[1][1];
+    up.z = pelvis->rot[1][2];
+    forward.x = pelvis->rot[2][0];
+    forward.y = pelvis->rot[2][1];
+    forward.z = pelvis->rot[2][2];
+
+    if (yaw != 0.0f) {
+        Matrix_RotateAxisS((s16)yaw, &up, MTXMODE_APPLY);
+    }
+    if (roll != 0.0f) {
+        Matrix_RotateAxisS((s16)roll, &forward, MTXMODE_APPLY);
+    }
+
+    Boss07_Player_DrawGlutes(this, play);
 }
 
 void Boss07_Player_Draw(Actor* thisx, PlayState* play2) {

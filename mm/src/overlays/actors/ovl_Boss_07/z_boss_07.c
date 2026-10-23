@@ -381,6 +381,7 @@ void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play);
 void Boss07_Player_FireBeam(Boss07* this, PlayState* play);
 void Boss07_Player_WrathWalkLimb(Boss07* this, s32 limbIndex, Vec3f* pos, Vec3s* rot);
 void Boss07_Player_DrawBust(Boss07* this, PlayState* play);
+void Boss07_Player_WrathTransformLimb(Boss07* this, PlayState* play, s32 limbIndex);
 s32 Boss07_IsPlayerAttack(Actor* actor);
 
 void Boss07_Wrath_SetupIntroCutscene(Boss07* this, PlayState* play);
@@ -3583,6 +3584,17 @@ s32 Boss07_Wrath_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, V
     // 2S2H "Play as Majora": Wrath has no walk animation, the player Wrath's walk is added here
     if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
         Boss07_Player_WrathWalkLimb(this, limbIndex, pos, rot);
+
+        // Her curvier figure: moved copies of her body's display lists
+        if ((*dList != NULL) &&
+            ((limbIndex == MAJORAS_WRATH_LIMB_PELVIS) || (limbIndex == MAJORAS_WRATH_LIMB_TORSO) ||
+             (limbIndex == MAJORAS_WRATH_LIMB_LEFT_THIGH) || (limbIndex == MAJORAS_WRATH_LIMB_RIGHT_THIGH))) {
+            Gfx* figureDL = PlayAsMajora_GetWrathFigureDL(limbIndex);
+
+            if (figureDL != NULL) {
+                *dList = figureDL;
+            }
+        }
     }
 
     return false;
@@ -3737,6 +3749,12 @@ void Boss07_Wrath_TransformLimbDraw(PlayState* play, s32 limbIndex, Actor* thisx
         (limbIndex == MAJORAS_WRATH_LIMB_LEFT_UPPER_ARM) || (limbIndex == MAJORAS_WRATH_LIMB_LEFT_FOREARM) ||
         (limbIndex == MAJORAS_WRATH_LIMB_LEFT_HAND) || (limbIndex == MAJORAS_WRATH_LIMB_HEAD)) {
         Matrix_Scale(1.0f, this->incarnationArmScale, this->incarnationArmScale, MTXMODE_APPLY);
+    }
+
+    // 2S2H "Play as Majora": the player Wrath's hip sway and glutes. Only this limb's own mesh (and the vertices
+    // skinned to it) turns, not the limbs below it.
+    if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+        Boss07_Player_WrathTransformLimb(this, play, limbIndex);
     }
 }
 

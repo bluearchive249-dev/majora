@@ -1239,6 +1239,50 @@ void BenMenu::AddEnhancements() {
         .Options(
             FloatSliderOptions().Min(0.2f).Max(1.5f).Step(0.05f).DefaultValue(0.65f).IsPercentage().Format("").Tooltip(
                 "How far the bust juts out."));
+    AddWidget(path, "Majora's Wrath: Curvy Figure", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.WrathFigure")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Gives your Wrath an hourglass figure: a slim waist, wide hips and a big, round butt."));
+    AddWidget(path, "Majora's Wrath Waist: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.WrathWaist")
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0) ||
+                            !CVarGetInteger("gModes.PlayAsMajora.WrathFigure", 1);
+        })
+        .Options(
+            FloatSliderOptions().Min(0.0f).Max(2.0f).Step(0.05f).DefaultValue(1.0f).IsPercentage().Format("").Tooltip(
+                "How much the waist is taken in. 0% is her normal waist."));
+    AddWidget(path, "Majora's Wrath Hips: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.WrathHips")
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0) ||
+                            !CVarGetInteger("gModes.PlayAsMajora.WrathFigure", 1);
+        })
+        .Options(
+            FloatSliderOptions().Min(0.0f).Max(2.0f).Step(0.05f).DefaultValue(1.0f).IsPercentage().Format("").Tooltip(
+                "How much wider the hips are. 0% is her normal hips."));
+    AddWidget(path, "Majora's Wrath Butt: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.WrathButt")
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0) ||
+                            !CVarGetInteger("gModes.PlayAsMajora.WrathFigure", 1);
+        })
+        .Options(
+            FloatSliderOptions().Min(0.0f).Max(2.0f).Step(0.05f).DefaultValue(1.0f).IsPercentage().Format("").Tooltip(
+                "How big and round the butt is. 0% is her normal rear."));
+    AddWidget(path, "Majora's Wrath Hip Sway: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.WrathHipSway")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(
+            FloatSliderOptions().Min(0.0f).Max(2.5f).Step(0.05f).DefaultValue(1.0f).IsPercentage().Format("").Tooltip(
+                "How much her hips sway and her butt bounces as she walks and runs."));
+    AddWidget(path, "Majora's Wrath: Dominatrix Idle", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.WrathIdlePose")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Standing still, your Wrath strikes a pose: a hand on her cocked hip, the other raised with its whip, "
+            "back straight and chin up."));
     AddWidget(path, "Majora Hover Height: %.0f", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gModes.PlayAsMajora.HoverHeight")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
