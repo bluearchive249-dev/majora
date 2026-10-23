@@ -376,6 +376,9 @@ void Boss07_Reset(void);
 
 // 2S2H "Play as Majora", see z_boss_07_player.inc
 void Boss07_Player_Init(Boss07* this, PlayState* play);
+void Boss07_PlayerProjectile_Init(Boss07* this, PlayState* play);
+void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play);
+s32 Boss07_IsPlayerAttack(Actor* actor);
 
 void Boss07_Wrath_SetupIntroCutscene(Boss07* this, PlayState* play);
 void Boss07_Wrath_IntroCutscene(Boss07* this, PlayState* play);
@@ -1202,6 +1205,10 @@ void Boss07_Incarnation_SpawnDust(Boss07* this, PlayState* play, u8 dustSpawnFra
             accel.y = -0.1f;
 
             pos.y = Rand_ZeroFloat(10.0f) + 3.0f;
+            // 2S2H "Play as Majora": on the floor under the player Majora, not the arena's
+            if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+                pos.y += this->playerFloorY;
+            }
 
             if ((u32)spawnPos != MAJORAS_INCARNATION_DUST_SPAWN_POS_FEET) {
                 pos.x = this->actor.focus.pos.x + Rand_CenteredFloat(150.0f);
@@ -1369,6 +1376,10 @@ void Boss07_Init(Actor* thisx, PlayState* play2) {
         Boss07_Player_Init(this, play);
         return;
     }
+    if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER_PROJECTILE) {
+        Boss07_PlayerProjectile_Init(this, play);
+        return;
+    }
 
     if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_BATTLE_HANDLER) {
         this->actor.update = Boss07_BattleHandler_Update;
@@ -1504,6 +1515,14 @@ void Boss07_Init(Actor* thisx, PlayState* play2) {
             this->actor.update = Boss07_IncarnationAfterimage_Update;
             this->actor.draw = Boss07_IncarnationAfterimage_Draw;
             this->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
+
+            // 2S2H "Play as Majora": the player Incarnation's afterimages have its size and aren't enemies
+            if ((this->actor.parent != NULL) && Boss07_IsPlayerAttack(this->actor.parent)) {
+                this->actor.scale = this->actor.parent->scale;
+                this->actor.flags &= ~ACTOR_FLAG_HOSTILE;
+                this->actor.flags |= ACTOR_FLAG_FREEZE_EXCEPTION;
+                Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_MISC);
+            }
         } else {
             this->actor.colChkInfo.damageTable = &sMajorasIncarnationDamageTable;
             this->actor.colChkInfo.health = 30;
@@ -1600,6 +1619,10 @@ void Boss07_Destroy(Actor* thisx, PlayState* play2) {
 
         // 2S2H "Play as Majora"
         case MAJORA_TYPE_PLAYER:
+            Boss07_Player_DestroyColliders(this, play);
+            break;
+
+        case MAJORA_TYPE_PLAYER_PROJECTILE:
             Collider_DestroyCylinder(play, &this->generalCollider);
             break;
 
@@ -3409,7 +3432,12 @@ void Boss07_Wrath_UpdateWhips(Boss07* this, PlayState* play, Vec3f* base, Vec3f*
         // Advances the physics one frame to find the provisional position relative to the previous point
         tempPos.x = pos->x + velocity->x - (pos - 1)->x + shapeForce.x + tensForce.x;
         tempY = pos->y + velocity->y + gravity + shapeForce.y + tensForce.y;
-        if (tempY < 2.0f) {
+        // 2S2H "Play as Majora": the whips lie on whatever floor is under the player Majora, not the arena's
+        if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+            if (tempY < this->playerFloorY + 2.0f) {
+                tempY = this->playerFloorY + 2.0f;
+            }
+        } else if (tempY < 2.0f) {
             tempY = 2.0f;
         }
 
@@ -3496,6 +3524,11 @@ void Boss07_Wrath_DrawWhip(Boss07* this, PlayState* play, Vec3f* pos, Vec3f* rot
     s32 pad[2];
     Vec3f* prevPos = pos;
     Vec3f* prevRot = rot;
+    // 2S2H "Play as Majora": the shadow lies on the floor under the player Majora, the whips are thinner on a smaller
+    // Wrath
+    u8 isPlayer = MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER;
+    f32 shadowY = isPlayer ? (this->playerFloorY + 1.0f) : 0.0f;
+    f32 thicknessFactor = isPlayer ? (this->actor.scale.x / 0.015f) : 1.0f;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -3505,11 +3538,12 @@ void Boss07_Wrath_DrawWhip(Boss07* this, PlayState* play, Vec3f* pos, Vec3f* rot
     topSegIndex = (hand == MAJORAS_WRATH_HAND_RIGHT) ? this->whipTopIndex : 0;
 
     for (i = 0; i < (sWhipLength - topSegIndex) - 1; i++, pos++, rot++) {
-        Matrix_Translate(pos->x, 0.0f, pos->z, MTXMODE_NEW);
+        Matrix_Translate(pos->x, shadowY, pos->z, MTXMODE_NEW);
         Matrix_Scale(1.0f, 0.0f, 1.0f, MTXMODE_APPLY);
         Matrix_RotateYF(rot->y, MTXMODE_APPLY);
         Matrix_RotateXFApply(rot->x);
         thicknessScale = (i > 24) ? 0.025f : ((f32)(24 - i) * 1 * 0.001f) + 0.025f;
+        thicknessScale *= thicknessFactor;
         Matrix_Scale(thicknessScale, thicknessScale, ((2 * lengthScale) + 0.5f) * 0.01f, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_OPA_DISP++, gMajorasWrathWhipModelDL);
@@ -3525,6 +3559,7 @@ void Boss07_Wrath_DrawWhip(Boss07* this, PlayState* play, Vec3f* pos, Vec3f* rot
         Matrix_RotateYF(rot->y, MTXMODE_APPLY);
         Matrix_RotateXFApply(rot->x);
         thicknessScale = (i > 24) ? 0.025f : ((f32)(24 - i) * 1 * 0.001f) + 0.025f;
+        thicknessScale *= thicknessFactor;
         Matrix_Scale(thicknessScale, thicknessScale, ((2 * lengthScale) + 0.5f) * 0.01f, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_OPA_DISP++, gMajorasWrathWhipModelDL);

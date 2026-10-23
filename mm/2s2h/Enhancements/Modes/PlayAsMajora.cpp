@@ -10,7 +10,8 @@
 //  - spawns Majora next to Link (again after every scene change) and removes it when the option is turned off,
 //  - lets Majora's actor load outside the Moon (its object isn't in other scenes' object lists),
 //  - filters Link's buttons so he can't use his sword, shield, rolls or (optionally) C-button items,
-//  - hides Link and his shadow while Majora is shown.
+//  - hides Link and his shadow while Majora is shown,
+//  - keeps Majora's form (Mask, Incarnation, Wrath) across areas, and lets Wrath's spin attack carry Link along.
 
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -26,6 +27,7 @@ extern "C" {
 #define CVAR_ENABLED CVarGetInteger(CVAR_ENABLED_NAME, 0)
 
 static bool sLinkShadowHidden = false;
+static u8 sForm = MAJORA_PLAYER_FORM_MASK; // kept across areas
 
 static Boss07* FindPlayerMajora(PlayState* play) {
     // It's spawned as a boss and moves itself to the misc list on its first frame
@@ -79,8 +81,21 @@ static void OnLinkUpdate(Actor* actor) {
     }
 
     if (majora == NULL) {
+        // rot.z: the form to start in
         Actor_Spawn(&play->actorCtx, play, ACTOR_BOSS_07, player->actor.world.pos.x, player->actor.world.pos.y,
-                    player->actor.world.pos.z, 0, player->actor.shape.rot.y, 0, MAJORA_PARAMS(MAJORA_TYPE_PLAYER));
+                    player->actor.world.pos.z, 0, player->actor.shape.rot.y, sForm, MAJORA_PARAMS(MAJORA_TYPE_PLAYER));
+    } else {
+        sForm = Boss07_Player_GetForm(&majora->actor);
+
+        // Wrath's spin attack glides toward the target and takes Link with it. Walls still stop him.
+        if (Boss07_Player_IsCarrying(&majora->actor)) {
+            player->actor.world.pos.x = majora->actor.world.pos.x;
+            player->actor.world.pos.z = majora->actor.world.pos.z;
+            player->speedXZ = 0.0f;
+            player->actor.speed = 0.0f;
+            Actor_UpdateBgCheckInfo(play, &player->actor, 26.0f, 18.0f, 60.0f,
+                                    UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_4);
+        }
     }
 
     SetLinkShadowHidden(player, ShouldHideLink(play));
@@ -96,8 +111,8 @@ static void FilterLinkInput(Input* input) {
     Boss07* majora = FindPlayerMajora(play);
     bool busy = Boss07_Player_IsBusy(&majora->actor);
 
-    // B = sword, R = shield. Z still locks on: Majora attacks the lock-on target.
-    u16 blocked = BTN_B | BTN_R;
+    // B = sword, R = shield, D-pad: Majora's forms and taunts. Z still locks on: Majora attacks the lock-on target.
+    u16 blocked = BTN_B | BTN_R | BTN_DRIGHT | BTN_DLEFT | BTN_DUP;
 
     if (!CVarGetInteger(CVAR_PLAY_AS_MAJORA("KeepItems"), 0)) {
         blocked |= BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT;

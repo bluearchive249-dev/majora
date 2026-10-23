@@ -32,6 +32,7 @@ typedef enum MajoraType {
     /* 100 */ MAJORA_TYPE_PROJECTILE_REMAINS = 100,
     /* 101 */ MAJORA_TYPE_PROJECTILE_INCARNATION,
     /*  50 */ MAJORA_TYPE_PLAYER = 50, // 2S2H "Play as Majora": player-controlled Majora that follows Link
+    /*  51 */ MAJORA_TYPE_PLAYER_PROJECTILE, // 2S2H "Play as Majora": the player Incarnation's energy balls
     /* 150 */ MAJORA_TYPE_BATTLE_HANDLER = 150, // handles effects, lens flare, the Remains activation cutscene, etc.
     /* 180 */ MAJORA_TYPE_TOP = 180,
     /* 200 */ MAJORA_TYPE_REMAINS = 200
@@ -304,7 +305,16 @@ typedef struct Boss07 {
     Vec3f playerAimPos;   // where attacks go: the lock-on target, the enemy in front, or straight ahead
     Actor* playerTarget;
     f32 playerFloorY;     // the floor under Majora, for the tentacles and effects (the arena floor is y = 0)
+    u8 playerColliders;   // which colliders are initialized, see `MAJORA_PLAYER_COLLIDER_*`
+    u8 playerNextAttack;  // Wrath: the combo's next whip attack, queued by pressing B during one (0 = none)
+    u8 playerCarry;       // Wrath's spin attack carries Link along
+    s16 playerFormTimer;  // counts down while the new form grows in
+    s16 playerHeldTimer;  // how long B has been held
 } Boss07;
+
+#define MAJORA_PLAYER_COLLIDER_CYLINDER (1 << 0)
+#define MAJORA_PLAYER_COLLIDER_BODY (1 << 1)
+#define MAJORA_PLAYER_COLLIDER_KICK (1 << 2)
 
 typedef enum MajoraPlayerForm {
     /* 0 */ MAJORA_PLAYER_FORM_MASK,
@@ -321,5 +331,7 @@ typedef enum MajoraPlayerForm {
 s32 Boss07_IsPlayerAttack(Actor* actor);
 s32 Boss07_Player_IsBusy(Actor* thisx);
 s32 Boss07_Player_IsHidden(Actor* thisx);
+s32 Boss07_Player_IsCarrying(Actor* thisx);
+u8 Boss07_Player_GetForm(Actor* thisx);
 
 #endif // Z_BOSS_07_H

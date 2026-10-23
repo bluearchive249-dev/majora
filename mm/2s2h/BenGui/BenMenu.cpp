@@ -1174,27 +1174,50 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "Play as Majora", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsMajora.Enabled")
         .Options(CheckboxOptions().Tooltip(
-            "Replaces Link with Majora's Mask from the final battle, using its moves instead of Link's.\n\n"
-            " - B (or C-Left): Spin attack. The mask flies spinning at your lock-on target, the enemy in front, "
-            "or straight ahead, and comes back.\n"
-            " - Z: Lock on as usual.\n"
-            " - A: Doors, talking, climbing and grabbing still work. No rolls or jump attacks.\n\n"
+            "Replaces Link with Majora from the final battle, using its moves instead of Link's.\n\n"
+            "D-Pad Right: Majora's Incarnation. D-Pad Left: Majora's Wrath. The same button again: back to the "
+            "Mask.\n\n"
+            "Majora's Mask\n"
+            " - B / C-Left: Spin attack. The mask flies spinning at the target and comes back.\n\n"
+            "Majora's Incarnation\n"
+            " - B / C-Left: Energy balls. Hold to keep firing.\n"
+            " - D-Pad Up: Dance.\n\n"
+            "Majora's Wrath\n"
+            " - B: Quick whip. B again during it: three-hit combo. Hold B: whip flurry.\n"
+            " - R + B: Spin attack, gliding toward the target.\n"
+            " - C-Left: Double whip. C-Down: Kick. C-Right: Long whip. D-Pad Up: Taunt.\n\n"
+            "The target is your lock-on (Z) target, else the enemy in front, else straight ahead.\n"
+            "A still opens doors, talks, climbs and grabs. No rolls or jump attacks.\n"
             "Its attacks count as every damage type and go through armor and shields.\n"
             "Link is shown in his other forms, in first person, in crawlspaces and in cutscenes."));
     AddWidget(path, "Majora: Keep C-Button Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsMajora.KeepItems")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
         .Options(CheckboxOptions().Tooltip(
-            "Gives the C buttons back to Link's items and masks. Needed to finish the game (Ocarina, masks, ...)."));
+            "Gives the C buttons back to Link's items and masks. Needed to finish the game (Ocarina, masks, ...). "
+            "The C-button attacks are off then."));
     AddWidget(path, "Majora: Show Link in Cutscenes", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsMajora.ShowLinkInCutscenes")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
         .Options(CheckboxOptions().DefaultValue(true).Tooltip("Story cutscenes show Link instead of Majora."));
-    AddWidget(path, "Majora Size: %.3f", WIDGET_CVAR_SLIDER_FLOAT)
-        .CVar("gModes.PlayAsMajora.Scale")
+    AddWidget(path, "Majora's Mask Size: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.SizeMask")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
-        .Options(FloatSliderOptions().Min(0.02f).Max(0.1f).Step(0.005f).DefaultValue(0.05f).Format("%.3f").Tooltip(
-            "Size of the mask. 0.1 is its size in the final battle."));
+        .Options(
+            FloatSliderOptions().Min(0.2f).Max(1.0f).Step(0.05f).DefaultValue(0.5f).IsPercentage().Format("").Tooltip(
+                "Size of the mask, compared to the final battle."));
+    AddWidget(path, "Majora's Incarnation Size: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.SizeIncarnation")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(
+            FloatSliderOptions().Min(0.2f).Max(1.0f).Step(0.05f).DefaultValue(0.6f).IsPercentage().Format("").Tooltip(
+                "Size of Majora's Incarnation, compared to the final battle."));
+    AddWidget(path, "Majora's Wrath Size: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.SizeWrath")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(
+            FloatSliderOptions().Min(0.2f).Max(1.0f).Step(0.05f).DefaultValue(0.5f).IsPercentage().Format("").Tooltip(
+                "Size of Majora's Wrath and the reach of its whips, compared to the final battle."));
     AddWidget(path, "Majora Hover Height: %.0f", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gModes.PlayAsMajora.HoverHeight")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
