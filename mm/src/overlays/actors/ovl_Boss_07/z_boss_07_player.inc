@@ -14,9 +14,12 @@
  *
  *  - Majora's Mask floats at Link's head height, its tentacles trailing on the floor.
  *    B / C-Left: spin attack. The mask flies spinning at the target, cuts through everything on the way and comes back.
- *  - Majora's Incarnation (D-Pad Right) runs with Link, leaving afterimages at full speed.
- *    B / C-Left: energy balls from both hands, at the target. Hold to keep firing. D-Pad Up: a dance.
- *  - Majora's Wrath (D-Pad Left) glides with Link, its two whips trailing.
+ *    R + B / C-Right: fire beam from its eyes, held as long as the button is. Aims at the target, or the stick steers it.
+ *  - Majora's Incarnation (D-Pad Right) runs with Link (faster than Link), leaving afterimages at full speed.
+ *    B / C-Left: energy balls from both hands, at the target. Hold to keep firing.
+ *    D-Pad Up: a dance, in turn: squatting dance, moonwalk (slides backwards, the stick picks the way), pirouette, taunt.
+ *  - Majora's Wrath (D-Pad Left) walks with Link (a walk cycle built for her skeleton), its two whips trailing.
+ *    Every whip segment hits while the whip moves fast. Optional bust (from her chest's eyes).
  *    B: quick whip, B again during it: the three-hit combo. Hold B: whip flurry. R + B: spin attack that carries Link.
  *    C-Left: double whip. C-Down: kick. C-Right: long whip. D-Pad Up: taunt.
  *
@@ -26,6 +29,8 @@
 // clang-format on
 
 #define MAJORA_PLAYER_CVAR(name) ("gModes.PlayAsMajora." name)
+
+#include "z_boss_07_player_bust.inc"
 
 // Each form's scale in the final battle; the menu sizes are fractions of these
 #define MAJORA_PLAYER_MASK_BATTLE_SCALE 0.1f
@@ -50,6 +55,8 @@ void Boss07_Player_SetupIncarnationDance(Boss07* this, PlayState* play);
 void Boss07_Player_IncarnationDance(Boss07* this, PlayState* play);
 void Boss07_Player_SetupWrathMove(Boss07* this, PlayState* play);
 void Boss07_Player_WrathMove(Boss07* this, PlayState* play);
+void Boss07_Player_SetupFireBeam(Boss07* this, PlayState* play);
+void Boss07_Player_FireBeam(Boss07* this, PlayState* play);
 
 typedef enum MajoraPlayerSpinSubAction {
     /* 0 */ MAJORA_PLAYER_SPIN_WIND_UP,
@@ -71,6 +78,16 @@ typedef enum MajoraPlayerDance {
 #define MAJORA_PLAYER_AIM_RANGE 700.0f
 #define MAJORA_PLAYER_AIM_CONE 0x2800
 #define MAJORA_PLAYER_BALL_SPEED 25.0f
+#define MAJORA_PLAYER_BEAM_RANGE 1500.0f
+#define MAJORA_PLAYER_BEAM_SPHERES 24
+#define MAJORA_PLAYER_MOONWALK_SPEED 9.0f
+
+// Wrath's walk, found from her skeleton (object_boss07): the thighs swing on their z axis (negative = forward), the
+// knees bend on the lower-leg roots' z axis, the upper arms swing on their y axis. Per 0x1000 of thigh swing the foot
+// moves 2282 model units.
+#define MAJORA_PLAYER_WALK_FOOT_PER_BINANG (2282.0f / 0x1000)
+
+static EffectTireMarkInit sPlayerBeamTireMarkInit = { 0, 40, { 0, 0, 15, 200 } };
 
 // The mask's hit while it spins, and the energy balls. AT only: enemies' hits go to Link, not to Majora.
 static ColliderCylinderInit sPlayerMaskAttackCylinderInit = {
@@ -125,9 +142,6 @@ static AnimationHeader* sPlayerWrathAttackAnims[] = {
     &gMajorasWrathKickAnim,                  // MAJORAS_WRATH_ATTACK_SUB_ACTION_KICK
 };
 
-// Whip points that become hit spheres while a whip cracks: the right whip uses spheres 0-5, the left 6-10
-static s16 sPlayerWrathWhipHitPoints[MAJORAS_WRATH_COLLIDER_BODYPART_MAX] = { 14, 20, 26, 32, 38, 43,
-                                                                               14, 22, 30, 37, 43 };
 
 // ------------------------------------------------------------------------------------------------
 // Queries used by the Link side and by the collision code
@@ -445,7 +459,74 @@ static void Boss07_Player_KillAfterimages(Boss07* this, PlayState* play) {
     this->fireTimer = 0;
 }
 
-void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play) {
+// ------------------------------------------------------------------------------------------------
+// Majora's own hits: one collider of spheres, placed and switched on every frame (whip segments, the beam)
+// ------------------------------------------------------------------------------------------------
+
+static void Boss07_Player_InitHitCollider(Boss07* this, PlayState* play) {
+    static ColliderJntSphElementInit sElementsInit[MAJORA_PLAYER_HIT_SPHERES];
+    static ColliderJntSphInit sInit = {
+        { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_JNTSPH },
+        MAJORA_PLAYER_HIT_SPHERES,
+        sElementsInit,
+    };
+    s32 i;
+
+    for (i = 0; i < MAJORA_PLAYER_HIT_SPHERES; i++) {
+        ColliderJntSphElementInit* elem = &sElementsInit[i];
+
+        elem->base.elemMaterial = ELEM_MATERIAL_UNK0;
+        elem->base.atDmgInfo.dmgFlags = DMG_MAJORA_PLAYER;
+        elem->base.atDmgInfo.effect = 0;
+        elem->base.atDmgInfo.damage = 2;
+        elem->base.acDmgInfo.dmgFlags = 0;
+        elem->base.acDmgInfo.effect = 0;
+        elem->base.acDmgInfo.defense = 0;
+        elem->base.atElemFlags = ATELEM_ON | ATELEM_SFX_NORMAL;
+        elem->base.acElemFlags = ACELEM_NONE;
+        elem->base.ocElemFlags = OCELEM_NONE;
+        elem->dim.limb = 0;
+        elem->dim.modelSphere.center.x = elem->dim.modelSphere.center.y = elem->dim.modelSphere.center.z = 0;
+        elem->dim.modelSphere.radius = 10;
+        elem->dim.scale = 100;
+    }
+
+    Collider_InitAndSetJntSph(play, &this->playerHitCollider, &this->actor, &sInit, this->playerHitElements);
+    this->playerColliders |= MAJORA_PLAYER_COLLIDER_HIT;
+}
+
+static void Boss07_Player_ClearHits(Boss07* this) {
+    s32 i;
+
+    for (i = 0; i < MAJORA_PLAYER_HIT_SPHERES; i++) {
+        this->playerHitElements[i].base.atElemFlags &= ~ATELEM_ON;
+    }
+}
+
+static void Boss07_Player_SetHit(Boss07* this, s32 index, Vec3f* pos, f32 radius, u8 damage) {
+    ColliderJntSphElement* elem = &this->playerHitElements[index];
+
+    elem->base.atElemFlags |= ATELEM_ON;
+    elem->base.atDmgInfo.damage = damage;
+    elem->dim.worldSphere.center.x = pos->x;
+    elem->dim.worldSphere.center.y = pos->y;
+    elem->dim.worldSphere.center.z = pos->z;
+    elem->dim.worldSphere.radius = radius;
+}
+
+static void Boss07_Player_SubmitHits(Boss07* this, PlayState* play) {
+    s32 i;
+
+    for (i = 0; i < MAJORA_PLAYER_HIT_SPHERES; i++) {
+        if (this->playerHitElements[i].base.atElemFlags & ATELEM_ON) {
+            CollisionCheck_SetAT(play, &play->colChkCtx, &this->playerHitCollider.base);
+            return;
+        }
+    }
+}
+
+// The colliders and effects that belong to one form
+static void Boss07_Player_DestroyFormColliders(Boss07* this, PlayState* play) {
     Boss07_Player_KillAfterimages(this, play);
 
     if (this->playerColliders & MAJORA_PLAYER_COLLIDER_CYLINDER) {
@@ -456,6 +537,18 @@ void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play) {
     }
     if (this->playerColliders & MAJORA_PLAYER_COLLIDER_KICK) {
         Collider_DestroyJntSph(play, &this->kickCollider);
+    }
+    if (this->playerColliders & MAJORA_PLAYER_COLLIDER_TIRE_MARK) {
+        Effect_Destroy(play, this->effectIndex);
+    }
+    this->playerColliders &= MAJORA_PLAYER_COLLIDER_HIT;
+}
+
+void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play) {
+    Boss07_Player_DestroyFormColliders(this, play);
+
+    if (this->playerColliders & MAJORA_PLAYER_COLLIDER_HIT) {
+        Collider_DestroyJntSph(play, &this->playerHitCollider);
     }
     this->playerColliders = 0;
 }
@@ -468,7 +561,10 @@ static void Boss07_Player_SetForm(Boss07* this, PlayState* play, u8 form, s32 tr
     f32 scale = Boss07_Player_GetBattleScale(form) * Boss07_Player_GetSizeRatio(form);
     s32 i;
 
-    Boss07_Player_DestroyColliders(this, play);
+    Boss07_Player_DestroyFormColliders(this, play);
+    Boss07_Player_ClearHits(this);
+    this->playerWalkPhase = 0.0f;
+    this->playerWalkWeight = 0.0f;
 
     this->playerForm = form;
     this->playerNextAttack = 0;
@@ -529,10 +625,12 @@ static void Boss07_Player_SetForm(Boss07* this, PlayState* play, u8 form, s32 tr
             ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 70.0f);
             SkelAnime_InitFlex(play, &this->skelAnime, &gMajorasWrathSkel, &gMajorasWrathIdleAnim, this->jointTable,
                                this->morphTable, MAJORAS_WRATH_LIMB_MAX);
-            // The body spheres become the whips' hits while they crack, the kick keeps its foot
+            // Its draw positions the body spheres; they're never checked. The whips hit through `playerHitCollider`.
             Collider_InitAndSetJntSph(play, &this->bodyCollider, &this->actor, &sWrathBodyColliderJntSphInit,
                                       this->bodyColliderElements);
-            Boss07_Player_MakeAttackJntSph(&this->bodyCollider, 2);
+            this->bodyCollider.base.atFlags = AT_NONE;
+            this->bodyCollider.base.acFlags = AC_NONE;
+            this->bodyCollider.base.ocFlags1 = OC1_NONE;
             Collider_InitAndSetJntSph(play, &this->kickCollider, &this->actor, &sWrathKickColliderJntSphInit,
                                       this->kickColliderElements);
             Boss07_Player_MakeAttackJntSph(&this->kickCollider, 4);
@@ -558,6 +656,10 @@ static void Boss07_Player_SetForm(Boss07* this, PlayState* play, u8 form, s32 tr
             this->tentacleLengthScale = scale / MAJORA_PLAYER_MASK_BATTLE_SCALE;
             this->maskEyeTexIndex = MAJORAS_MASK_EYE_NORMAL;
             this->tentacleState = MAJORAS_MASK_TENTACLE_STATE_DEFAULT;
+            // The fire beam burns a trail on the floor
+            Effect_Add(play, &this->effectIndex, EFFECT_TIRE_MARK, 0, 0, &sPlayerBeamTireMarkInit);
+            this->playerColliders |= MAJORA_PLAYER_COLLIDER_TIRE_MARK;
+            this->beamTireMarkEnabled = this->prevBeamTireMarkEnabled = false;
             Boss07_Player_SetupFloat(this, play);
             break;
     }
@@ -658,6 +760,8 @@ void Boss07_Player_Init(Boss07* this, PlayState* play) {
     this->playerPrevInvincibility = 0;
     this->playerColliders = 0;
     this->playerFloorY = GET_PLAYER(play)->actor.floorHeight;
+    this->playerDanceIndex = 0;
+    Boss07_Player_InitHitCollider(this, play);
 
     // A new area starts in the form Majora was in (home.rot.z carries it over from PlayAsMajora.cpp)
     Boss07_Player_SetForm(this, play, CLAMP(this->actor.home.rot.z, 0, MAJORA_PLAYER_FORM_WRATH), false);
@@ -776,6 +880,170 @@ void Boss07_Player_SpinAttack(Boss07* this, PlayState* play) {
     }
 }
 
+// The beam's direction from the mask's facing: the same rotations its draw uses
+static void Boss07_Player_GetBeamDir(Boss07* this, Vec3f* dir) {
+    Matrix_RotateYS(this->actor.shape.rot.y, MTXMODE_NEW);
+    Matrix_RotateXS(this->actor.shape.rot.x, MTXMODE_APPLY);
+    Matrix_MultVecZ(1.0f, dir);
+}
+
+void Boss07_Player_SetupFireBeam(Boss07* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+
+    this->actionFunc = Boss07_Player_FireBeam;
+    this->subAction = MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_CHARGE_UP;
+    this->timers[0] = 12;
+    this->timers[1] = 0;
+    this->speedToTarget = 0.0f;
+    Boss07_Mask_StopBeam(this);
+    Boss07_Player_UpdateAim(this, play);
+    this->playerBeamYaw = player->actor.shape.rot.y;
+    this->playerBeamPitch = 0x800; // a little down, toward the floor ahead
+    Audio_PlaySfx_AtPos(&sMajoraSfxPos, NA_SE_EN_LAST1_BLOW_OLD);
+}
+
+void Boss07_Player_FireBeam(Boss07* this, PlayState* play) {
+    Input* input = CONTROLLER1(&play->state);
+    s32 held = CHECK_BTN_ANY(input->cur.button, BTN_B | BTN_CRIGHT);
+    f32 scale = this->actor.scale.x;
+    s16 targetYaw;
+    s16 targetPitch;
+    Vec3f dir;
+    Vec3f end;
+    Vec3f hitPos;
+    CollisionPoly* poly;
+    s32 bgId;
+    f32 length;
+    s32 i;
+
+    Boss07_Player_Follow(this, play);
+    this->tentacleState = MAJORAS_MASK_TENTACLE_STATE_FIRING_BEAM;
+    Math_ApproachS(&this->actor.shape.rot.z, 0, 0xA, 0x400);
+
+    // Aims at a living target; with nothing targeted the stick steers it
+    if ((this->playerTarget != NULL) && (this->playerTarget->update != NULL)) {
+        f32 dx = this->playerTarget->focus.pos.x - this->actor.world.pos.x;
+        f32 dy = this->playerTarget->focus.pos.y - this->actor.world.pos.y;
+        f32 dz = this->playerTarget->focus.pos.z - this->actor.world.pos.z;
+
+        targetYaw = Math_Atan2S(dx, dz);
+        targetPitch = -Math_Atan2S(dy, sqrtf(SQ(dx) + SQ(dz)));
+        this->playerBeamYaw = targetYaw;
+        this->playerBeamPitch = targetPitch;
+    } else {
+        this->playerBeamYaw -= input->cur.stick_x * 0x18;
+        this->playerBeamPitch -= input->cur.stick_y * 0x10;
+        this->playerBeamPitch = CLAMP(this->playerBeamPitch, -0x2000, 0x3000);
+        targetYaw = this->playerBeamYaw;
+        targetPitch = this->playerBeamPitch;
+    }
+    Math_ApproachS(&this->actor.shape.rot.y, targetYaw, 3, 0x1000);
+    Math_ApproachS(&this->actor.shape.rot.x, targetPitch, 3, 0x1000);
+    this->actor.world.rot.y = this->actor.shape.rot.y;
+
+    switch (this->subAction) {
+        case MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_CHARGE_UP:
+            if (this->timers[0] == 0) {
+                this->subAction = MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_FIRE_EYE_BEAMS;
+                this->timers[0] = 6;
+                this->beamBaseScale = 1.0f;
+            }
+            break;
+
+        case MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_FIRE_EYE_BEAMS:
+            Math_ApproachF(&this->eyeBeamsLengthScale, 1.0f, 1.0f, 0.2f);
+            if (this->timers[0] == 0) {
+                this->subAction = MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_GROW_FOCUS_LIGHT_ORB;
+                this->timers[0] = 8;
+            }
+            break;
+
+        case MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_GROW_FOCUS_LIGHT_ORB:
+            Audio_PlaySfx(NA_SE_EN_LAST1_BEAM_OLD - SFX_FLAG);
+            Math_ApproachF(&this->eyeBeamsFocusOrbScale, 1.0f, 0.2f, 0.2f);
+            if (this->timers[0] == 0) {
+                this->subAction = MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_BEAM_ACTIVE;
+                this->timers[0] = 150; // the longest it lasts
+                this->timers[1] = 30;  // the shortest
+            }
+            break;
+
+        case MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_BEAM_ACTIVE:
+        case MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_END:
+            Math_ApproachF(&this->eyeBeamsFocusOrbScale, 1.0f, 0.2f, 0.2f);
+
+            // The beam runs from the mask's mouth to the first wall or floor
+            Boss07_Player_GetBeamDir(this, &dir);
+            this->beamStartPos.x = this->actor.world.pos.x + (dir.x * 1150.0f * scale);
+            this->beamStartPos.y = this->actor.world.pos.y + (dir.y * 1150.0f * scale);
+            this->beamStartPos.z = this->actor.world.pos.z + (dir.z * 1150.0f * scale);
+            end.x = this->beamStartPos.x + (dir.x * MAJORA_PLAYER_BEAM_RANGE);
+            end.y = this->beamStartPos.y + (dir.y * MAJORA_PLAYER_BEAM_RANGE);
+            end.z = this->beamStartPos.z + (dir.z * MAJORA_PLAYER_BEAM_RANGE);
+
+            if (BgCheck_EntityLineTest1(&play->colCtx, &this->beamStartPos, &end, &hitPos, &poly, true, true, true,
+                                        true, &bgId)) {
+                length = Math_Vec3f_DistXYZ(&this->beamStartPos, &hitPos);
+
+                if (this->subAction == MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_BEAM_ACTIVE) {
+                    // Burns a trail on floors, sparks on walls
+                    if (COLPOLY_GET_NORMAL(poly->normal.y) > 0.5f) {
+                        func_800AE930(&play->colCtx, Effect_GetByIndex(this->effectIndex), &hitPos, 15.0f,
+                                      Math_Atan2S(this->prevBeamTireMarkPos.x - hitPos.x,
+                                                  this->prevBeamTireMarkPos.z - hitPos.z),
+                                      poly, bgId);
+                        this->beamTireMarkEnabled = true;
+                    }
+                    this->prevBeamTireMarkPos = hitPos;
+
+                    if ((this->frameCounter % 6) == 0) {
+                        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_CLEAR_TAG, hitPos.x, hitPos.y, hitPos.z, 0, 0,
+                                    1, CLEAR_TAG_PARAMS(CLEAR_TAG_SMALL_LIGHT_RAYS));
+                    }
+                }
+            } else {
+                length = MAJORA_PLAYER_BEAM_RANGE;
+            }
+
+            // Its draw makes it 201 x scale x beamLengthScale long
+            Math_ApproachF(&this->beamLengthScale, length / (201.0f * scale), 1.0f, 40.0f);
+
+            if (this->subAction == MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_BEAM_ACTIVE) {
+                f32 reach = CLAMP_MAX(this->beamLengthScale * 201.0f * scale, length);
+                f32 radius = (25.0f * Boss07_Player_GetSizeRatio(MAJORA_PLAYER_FORM_MASK)) + 15.0f;
+
+                Audio_PlaySfx(NA_SE_EN_LAST1_BEAM_OLD - SFX_FLAG);
+
+                // Hits all along it
+                for (i = 0; i < MAJORA_PLAYER_BEAM_SPHERES; i++) {
+                    Vec3f pos;
+                    f32 d = reach * (i + 0.5f) / MAJORA_PLAYER_BEAM_SPHERES;
+
+                    pos.x = this->beamStartPos.x + (dir.x * d);
+                    pos.y = this->beamStartPos.y + (dir.y * d);
+                    pos.z = this->beamStartPos.z + (dir.z * d);
+                    Boss07_Player_SetHit(this, i, &pos, radius, 2);
+                }
+
+                // Held as long as the button is
+                if ((this->timers[0] == 0) || (!held && (this->timers[1] == 0))) {
+                    this->subAction = MAJORAS_MASK_FIRE_BEAM_SUB_ACTION_END;
+                    this->timers[0] = 20;
+                }
+            } else {
+                Math_ApproachZeroF(&this->beamBaseScale, 1.0f, 0.05f);
+                if (this->timers[0] == 0) {
+                    Boss07_Mask_StopBeam(this);
+                    Boss07_Player_SetupFloat(this, play);
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
 static s32 Boss07_Player_IsMaskFlying(Boss07* this) {
     return (this->actionFunc == Boss07_Player_SpinAttack) &&
            ((this->subAction == MAJORA_PLAYER_SPIN_OUT) || (this->subAction == MAJORA_PLAYER_SPIN_RETURN));
@@ -787,6 +1055,7 @@ static s32 Boss07_Player_IsMaskFlying(Boss07* this) {
 
 void Boss07_Player_SetupIncarnationMove(Boss07* this, PlayState* play) {
     this->actionFunc = Boss07_Player_IncarnationMove;
+    this->playerCarry = false;
     Animation_MorphToLoop(&this->skelAnime, &gMajorasIncarnationStationaryAnim, -5.0f);
     this->subAction = false; // running
     this->skelAnime.playSpeed = 1.0f;
@@ -889,19 +1158,50 @@ void Boss07_Player_SetupIncarnationDance(Boss07* this, PlayState* play) {
     };
 
     this->actionFunc = Boss07_Player_IncarnationDance;
-    this->subAction = Rand_ZeroFloat(MAJORA_PLAYER_DANCE_MAX - 0.01f);
+    // The dances come in turn
+    this->subAction = this->playerDanceIndex % MAJORA_PLAYER_DANCE_MAX;
+    this->playerDanceIndex = (this->subAction + 1) % MAJORA_PLAYER_DANCE_MAX;
     Animation_MorphToLoop(&this->skelAnime, sDanceAnims[this->subAction], -5.0f);
     this->skelAnime.playSpeed = 1.0f;
-    this->timers[0] = 90;
+    this->timers[0] = (this->subAction == MAJORA_PLAYER_DANCE_MOONWALK) ? 120 : 90;
     this->cutsceneTimer = 0;
     this->actor.speed = 0.0f;
+}
+
+// The moonwalk slides backwards, taking Link along (walls stop him). The stick picks the way it slides.
+static void Boss07_Player_Moonwalk(Boss07* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    Input* input = CONTROLLER1(&play->state);
+    f32 stickMag;
+    s16 stickAngle;
+    f32 speed = MAJORA_PLAYER_MOONWALK_SPEED * (Boss07_Player_GetSizeRatio(MAJORA_PLAYER_FORM_INCARNATION) / 0.6f);
+
+    Lib_GetControlStickData(&stickMag, &stickAngle, input);
+    if (stickMag > 15.0f) {
+        s16 slideYaw = Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)) + stickAngle;
+
+        // Faces away from where it slides
+        Math_ApproachS(&this->actor.shape.rot.y, slideYaw + 0x8000, 3, 0x800);
+    }
+
+    // Link was moved here (and stopped by walls) since last frame
+    this->actor.world.pos = player->actor.world.pos;
+    this->actor.world.pos.x -= Math_SinS(this->actor.shape.rot.y) * speed;
+    this->actor.world.pos.z -= Math_CosS(this->actor.shape.rot.y) * speed;
+    this->actor.world.rot.y = this->actor.shape.rot.y;
+    this->actor.speed = speed; // for the dust
+    this->playerCarry = true;
 }
 
 void Boss07_Player_IncarnationDance(Boss07* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     SkelAnime_Update(&this->skelAnime);
-    Boss07_Player_Follow(this, play);
+    if (this->subAction == MAJORA_PLAYER_DANCE_MOONWALK) {
+        Boss07_Player_Moonwalk(this, play);
+    } else {
+        Boss07_Player_Follow(this, play);
+    }
 
     switch (this->subAction) {
         case MAJORA_PLAYER_DANCE_SQUATTING:
@@ -927,12 +1227,14 @@ void Boss07_Player_IncarnationDance(Boss07* this, PlayState* play) {
             break;
     }
 
-    if (this->subAction != MAJORA_PLAYER_DANCE_PIROUETTE) {
+    if ((this->subAction != MAJORA_PLAYER_DANCE_PIROUETTE) && (this->subAction != MAJORA_PLAYER_DANCE_MOONWALK)) {
         Math_ApproachS(&this->actor.shape.rot.y, player->actor.shape.rot.y, 3, 0x1000);
     }
 
     if (this->timers[0] == 0) {
         Boss07_Player_SetupIncarnationMove(this, play);
+        // Link faces where Incarnation ended up facing
+        player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = this->actor.shape.rot.y;
     }
 
     Boss07_Incarnation_SpawnDust(this, play, 7, MAJORAS_INCARNATION_DUST_SPAWN_POS_FEET);
@@ -960,6 +1262,11 @@ static void Boss07_Player_UpdateAfterimages(Boss07* this, PlayState* play) {
 // Majora's Wrath
 // ------------------------------------------------------------------------------------------------
 
+// Hip swing in binangs: a short step when walking slowly, a long stride when running
+static f32 Boss07_Player_GetWalkAmplitude(f32 moved) {
+    return 0x900 + (CLAMP(moved / 10.0f, 0.0f, 1.0f) * 0x900);
+}
+
 static void Boss07_Player_SetLooseWhips(Boss07* this) {
     this->rightWhip.mobility = this->leftWhip.mobility = 0.7f;
     this->rightWhip.gravity = this->leftWhip.gravity = -15.0f;
@@ -985,10 +1292,86 @@ void Boss07_Player_WrathMove(Boss07* this, PlayState* play) {
     moved = Boss07_Player_MovedXZ(this);
     Boss07_Player_SetLooseWhips(this);
 
-    // It glides: leans into the movement instead of walking
-    Math_ApproachF(&this->wrathLeanRotX, CLAMP_MAX(moved * 0.03f, 0.35f), 0.3f, 0.06f);
+    // Walks: the cycle advances with the distance covered, so the feet don't slide. One cycle is four foot swings
+    // (each foot sweeps forward and back while the other one carries her).
+    Math_ApproachF(&this->playerWalkWeight, (moved > 0.6f) ? 1.0f : 0.0f, 1.0f, 0.12f);
+    if (moved > 0.01f) {
+        f32 swing = MAJORA_PLAYER_WALK_FOOT_PER_BINANG * Boss07_Player_GetWalkAmplitude(moved) * this->actor.scale.x;
+
+        this->playerWalkPhase += (moved / (4.0f * swing)) * 2.0f * M_PIf;
+        if (this->playerWalkPhase > 2.0f * M_PIf) {
+            this->playerWalkPhase -= 2.0f * M_PIf;
+        }
+        this->actor.speed = moved; // for the walk amplitude in the draw
+    } else {
+        this->actor.speed = 0.0f;
+    }
+
+    // Leans into the movement a little
+    Math_ApproachF(&this->wrathLeanRotX, CLAMP_MAX(moved * 0.012f, 0.15f), 0.3f, 0.04f);
     Math_ApproachS(&this->actor.shape.rot.y, player->actor.shape.rot.y, 3, 0x1800);
     this->actor.world.rot.y = this->actor.shape.rot.y;
+
+    // Footsteps
+    if (this->playerWalkWeight > 0.5f) {
+        f32 s0 = sinf(this->playerWalkPhase);
+
+        if ((s0 * this->playerSwingSignPrev) < 0.0f) {
+            Actor_PlaySfx(&this->actor, NA_SE_EN_LAST2_WALK2_OLD);
+        }
+        this->playerSwingSignPrev = s0;
+    }
+}
+
+// Wrath's walk, on top of her idle animation (called from her limb draw)
+void Boss07_Player_WrathWalkLimb(Boss07* this, s32 limbIndex, Vec3f* pos, Vec3s* rot) {
+    f32 w = this->playerWalkWeight;
+    f32 amp;
+    f32 phaseL;
+    f32 phaseR;
+
+    if ((this->playerForm != MAJORA_PLAYER_FORM_WRATH) || (w <= 0.0f)) {
+        return;
+    }
+
+    amp = Boss07_Player_GetWalkAmplitude(this->actor.speed) * w;
+    phaseL = this->playerWalkPhase;
+    phaseR = this->playerWalkPhase + M_PIf;
+
+    switch (limbIndex) {
+        // Hips: forward is negative z
+        case MAJORAS_WRATH_LIMB_LEFT_THIGH:
+            rot->z -= (s16)(amp * sinf(phaseL));
+            break;
+        case MAJORAS_WRATH_LIMB_RIGHT_THIGH:
+            rot->z -= (s16)(amp * sinf(phaseR));
+            break;
+
+        // Knees bend while the leg swings forward, lifting the foot
+        case MAJORAS_WRATH_LIMB_LEFT_LOWER_LEG_ROOT:
+            rot->z += (s16)(amp * 1.2f * CLAMP_MIN(cosf(phaseL), 0.0f));
+            break;
+        case MAJORAS_WRATH_LIMB_RIGHT_LOWER_LEG_ROOT:
+            rot->z += (s16)(amp * 1.2f * CLAMP_MIN(cosf(phaseR), 0.0f));
+            break;
+
+        // Arms swing against the legs: the right arm with the left leg. Right arm forward is negative y, left positive.
+        case MAJORAS_WRATH_LIMB_RIGHT_UPPER_ARM:
+            rot->y -= (s16)(amp * 0.5f * sinf(phaseL));
+            break;
+        case MAJORAS_WRATH_LIMB_LEFT_UPPER_ARM:
+            rot->y += (s16)(amp * 0.5f * sinf(phaseR));
+            break;
+
+        // At the long ends of a stride both feet rise (the legs swing in arcs): the body dips there to keep them
+        // on the floor
+        case MAJORAS_WRATH_LIMB_ROOT:
+            pos->y -= 450.0f * (amp / 0x1200) * SQ(sinf(phaseL));
+            break;
+
+        default:
+            break;
+    }
 }
 
 static void Boss07_Player_SetupWrathAttack(Boss07* this, PlayState* play, u8 attack) {
@@ -1058,31 +1441,28 @@ static void Boss07_Player_UpdateWrathAttack(Boss07* this, PlayState* play) {
     }
 }
 
-// The whips' hits while they crack: spheres along each whip with enough tension
+// Every whip segment hits while the whip moves fast (or cracks), during an attack. Right whip: spheres 0-48,
+// left whip: 50-98.
 static void Boss07_Player_UpdateWhipHits(Boss07* this, PlayState* play) {
     f32 ratio = this->actor.scale.x / MAJORA_PLAYER_WRATH_BATTLE_SCALE;
-    s32 anyActive = false;
+    f32 radius = (22.0f * this->whipLengthScale * 0.75f) + 6.0f;
+    f32 fastEnough = 4.0f * ratio;
+    s32 h;
     s32 i;
 
-    for (i = 0; i < MAJORAS_WRATH_COLLIDER_BODYPART_MAX; i++) {
-        ColliderJntSphElement* elem = &this->bodyCollider.elements[i];
-        MajoraWhip* whip = (i < 6) ? &this->rightWhip : &this->leftWhip;
-        s16 point = CLAMP_MAX(sPlayerWrathWhipHitPoints[i], (s16)sWhipLength - 1);
+    if (this->actionFunc == Boss07_Wrath_Attack) {
+        for (h = 0; h < 2; h++) {
+            MajoraWhip* whip = (h == 0) ? &this->rightWhip : &this->leftWhip;
+            s32 cracking = whip->tension >= 50.0f;
 
-        if ((this->actionFunc == Boss07_Wrath_Attack) && (whip->tension >= 50.0f)) {
-            elem->base.atElemFlags |= ATELEM_ON;
-            elem->dim.worldSphere.center.x = whip->pos[point].x;
-            elem->dim.worldSphere.center.y = whip->pos[point].y;
-            elem->dim.worldSphere.center.z = whip->pos[point].z;
-            elem->dim.worldSphere.radius = (s16)((30.0f * ratio) + 10.0f);
-            anyActive = true;
-        } else {
-            elem->base.atElemFlags &= ~ATELEM_ON;
+            for (i = 1; i < (s32)sWhipLength; i++) {
+                Vec3f* v = &whip->velocity[i];
+
+                if (cracking || ((SQ(v->x) + SQ(v->y) + SQ(v->z)) > SQ(fastEnough))) {
+                    Boss07_Player_SetHit(this, (h * 50) + i - 1, &whip->pos[i], radius, 2);
+                }
+            }
         }
-    }
-
-    if (anyActive) {
-        CollisionCheck_SetAT(play, &play->colChkCtx, &this->bodyCollider.base);
     }
 
     // The kick, from the foot (placed by the draw)
@@ -1128,8 +1508,11 @@ static void Boss07_Player_ReadButtons(Boss07* this, PlayState* play) {
 
     switch (this->playerForm) {
         case MAJORA_PLAYER_FORM_MASK:
-            if (CHECK_BTN_ALL(input->press.button, BTN_B) ||
-                (useCButtons && CHECK_BTN_ALL(input->press.button, BTN_CLEFT))) {
+            if ((CHECK_BTN_ALL(input->press.button, BTN_B) && CHECK_BTN_ALL(input->cur.button, BTN_R)) ||
+                (useCButtons && CHECK_BTN_ALL(input->press.button, BTN_CRIGHT))) {
+                Boss07_Player_SetupFireBeam(this, play);
+            } else if (CHECK_BTN_ALL(input->press.button, BTN_B) ||
+                       (useCButtons && CHECK_BTN_ALL(input->press.button, BTN_CLEFT))) {
                 Boss07_Player_SetupSpinAttack(this, play);
             }
             break;
@@ -1236,6 +1619,10 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
         Boss07_Player_SnapToLink(this, play);
     }
 
+    // The hits are placed again every frame
+    Boss07_Player_ClearHits(this);
+    this->beamTireMarkEnabled = false;
+
     if (this->playerForm == MAJORA_PLAYER_FORM_MASK) {
         this->maskEyeTexIndex =
             (player->stateFlags1 & PLAYER_STATE1_DEAD) ? MAJORAS_MASK_EYE_DULL : MAJORAS_MASK_EYE_NORMAL;
@@ -1300,8 +1687,45 @@ void Boss07_Player_Update(Actor* thisx, PlayState* play2) {
                 Collider_UpdateCylinder(&this->actor, &this->generalCollider);
                 CollisionCheck_SetAT(play, &play->colChkCtx, &this->generalCollider.base);
             }
+
+            // The beam's burn trail ends where the beam left the floor
+            if (!this->beamTireMarkEnabled && this->prevBeamTireMarkEnabled &&
+                (this->playerColliders & MAJORA_PLAYER_COLLIDER_TIRE_MARK)) {
+                func_800AEF44(Effect_GetByIndex(this->effectIndex));
+            }
+            this->prevBeamTireMarkEnabled = this->beamTireMarkEnabled;
             break;
     }
+
+    Boss07_Player_SubmitHits(this, play);
+}
+
+// The player Wrath's bust: two domes on her chest's eyes, the eyes at the tips (see z_boss_07_player_bust.inc).
+// Called from her limb draw right after the torso, with the torso's matrix.
+void Boss07_Player_DrawBust(Boss07* this, PlayState* play) {
+    f32 size = CVarGetFloat(MAJORA_PLAYER_CVAR("WrathBustSize"), 0.65f);
+    s32 i;
+
+    if (!CVarGetInteger(MAJORA_PLAYER_CVAR("WrathBust"), 1) || (size <= 0.0f)) {
+        return;
+    }
+
+    OPEN_DISPS(play->state.gfxCtx);
+
+    gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathBustMaterialDL);
+
+    for (i = 0; i < ARRAY_COUNT(sPlayerWrathBustDLs); i++) {
+        Matrix_Push();
+        Matrix_Translate(sPlayerWrathBustCenters[i].x, sPlayerWrathBustCenters[i].y, sPlayerWrathBustCenters[i].z,
+                         MTXMODE_APPLY);
+        Matrix_Mult(&sPlayerWrathBustFrames[i], MTXMODE_APPLY);
+        Matrix_Scale(1.0f, 1.0f, size, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_OPA_DISP++, sPlayerWrathBustDLs[i]);
+        Matrix_Pop();
+    }
+
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 void Boss07_Player_Draw(Actor* thisx, PlayState* play2) {

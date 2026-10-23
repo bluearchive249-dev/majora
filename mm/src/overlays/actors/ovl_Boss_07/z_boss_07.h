@@ -6,6 +6,8 @@
 
 struct Boss07;
 
+#define MAJORA_PLAYER_HIT_SPHERES 100 // 2S2H "Play as Majora": both whips' segments (2 x 49), or the beam
+
 #define MAJORA_TENTACLE_LENGTH 10
 #define MAJORA_TENTACLE_COUNT_MAX 100
 #define MAJORA_WHIP_LENGTH_MAX 50
@@ -310,11 +312,22 @@ typedef struct Boss07 {
     u8 playerCarry;       // Wrath's spin attack carries Link along
     s16 playerFormTimer;  // counts down while the new form grows in
     s16 playerHeldTimer;  // how long B has been held
+    u8 playerDanceIndex;  // Incarnation's next dance (they come in order)
+    f32 playerWalkPhase;  // Wrath's walk cycle, radians
+    f32 playerWalkWeight; // how much of the walk is blended in (0 standing, 1 walking)
+    f32 playerSwingSignPrev; // for Wrath's footsteps
+    s16 playerBeamYaw;    // the fire beam's aim when nothing is targeted, steered with the stick
+    s16 playerBeamPitch;
+    // Majora's own hits: every whip segment, the fire beam. One sphere each, switched on and off every frame.
+    ColliderJntSph playerHitCollider;
+    ColliderJntSphElement playerHitElements[MAJORA_PLAYER_HIT_SPHERES];
 } Boss07;
 
 #define MAJORA_PLAYER_COLLIDER_CYLINDER (1 << 0)
 #define MAJORA_PLAYER_COLLIDER_BODY (1 << 1)
 #define MAJORA_PLAYER_COLLIDER_KICK (1 << 2)
+#define MAJORA_PLAYER_COLLIDER_HIT (1 << 3)
+#define MAJORA_PLAYER_COLLIDER_TIRE_MARK (1 << 4)
 
 typedef enum MajoraPlayerForm {
     /* 0 */ MAJORA_PLAYER_FORM_MASK,

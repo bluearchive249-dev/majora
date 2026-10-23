@@ -151,6 +151,16 @@ static void RegisterPlayAsMajora() {
 
     COND_HOOK(OnPassPlayerInputs, CVAR_ENABLED, FilterLinkInput);
 
+    // Majora's Incarnation outruns Link: his run speed is raised while it's out
+    COND_VB_SHOULD(VB_SPEED_MODIFIER_WALK, CVAR_ENABLED, {
+        f32* speedTarget = va_arg(args, f32*);
+
+        if (ShouldHideLink(gPlayState) &&
+            (Boss07_Player_GetForm(&FindPlayerMajora(gPlayState)->actor) == MAJORA_PLAYER_FORM_INCARNATION)) {
+            *speedTarget *= CVarGetFloat(CVAR_PLAY_AS_MAJORA("IncarnationSpeed"), 2.0f);
+        }
+    });
+
     // Majora's object is only in the Moon's object list
     COND_VB_SHOULD(VB_ENABLE_OBJECT_DEPENDENCY, CVAR_ENABLED, {
         s16 objectId = (s16)va_arg(args, int);

@@ -1178,10 +1178,12 @@ void BenMenu::AddEnhancements() {
             "D-Pad Right: Majora's Incarnation. D-Pad Left: Majora's Wrath. The same button again: back to the "
             "Mask.\n\n"
             "Majora's Mask\n"
-            " - B / C-Left: Spin attack. The mask flies spinning at the target and comes back.\n\n"
+            " - B / C-Left: Spin attack. The mask flies spinning at the target and comes back.\n"
+            " - R + B / C-Right: Fire beam, as long as you hold it. Aims at the target, or steer it with the stick.\n\n"
             "Majora's Incarnation\n"
             " - B / C-Left: Energy balls. Hold to keep firing.\n"
-            " - D-Pad Up: Dance.\n\n"
+            " - D-Pad Up: The next dance: squatting dance, moonwalk (slides backwards, the stick picks the way), "
+            "pirouette, taunt.\n\n"
             "Majora's Wrath\n"
             " - B: Quick whip. B again during it: three-hit combo. Hold B: whip flurry.\n"
             " - R + B: Spin attack, gliding toward the target.\n"
@@ -1212,12 +1214,31 @@ void BenMenu::AddEnhancements() {
         .Options(
             FloatSliderOptions().Min(0.2f).Max(1.0f).Step(0.05f).DefaultValue(0.6f).IsPercentage().Format("").Tooltip(
                 "Size of Majora's Incarnation, compared to the final battle."));
+    AddWidget(path, "Majora's Incarnation Speed: %.1fx", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.IncarnationSpeed")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(1.0f).Max(3.0f).Step(0.1f).DefaultValue(2.0f).Format("%.1fx").Tooltip(
+            "How much faster than Link Majora's Incarnation runs."));
     AddWidget(path, "Majora's Wrath Size: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gModes.PlayAsMajora.SizeWrath")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
         .Options(
             FloatSliderOptions().Min(0.2f).Max(1.0f).Step(0.05f).DefaultValue(0.5f).IsPercentage().Format("").Tooltip(
                 "Size of Majora's Wrath and the reach of its whips, compared to the final battle."));
+    AddWidget(path, "Majora's Wrath: Bust", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsMajora.WrathBust")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "The eyes on Wrath's chest jut out as a bust, the eyes at the tips. Only your Wrath, not the boss."));
+    AddWidget(path, "Majora's Wrath Bust Size: %.0f%%", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsMajora.WrathBustSize")
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0) ||
+                            !CVarGetInteger("gModes.PlayAsMajora.WrathBust", 1);
+        })
+        .Options(
+            FloatSliderOptions().Min(0.2f).Max(1.5f).Step(0.05f).DefaultValue(0.65f).IsPercentage().Format("").Tooltip(
+                "How far the bust juts out."));
     AddWidget(path, "Majora Hover Height: %.0f", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gModes.PlayAsMajora.HoverHeight")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })

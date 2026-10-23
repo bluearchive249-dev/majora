@@ -378,6 +378,9 @@ void Boss07_Reset(void);
 void Boss07_Player_Init(Boss07* this, PlayState* play);
 void Boss07_PlayerProjectile_Init(Boss07* this, PlayState* play);
 void Boss07_Player_DestroyColliders(Boss07* this, PlayState* play);
+void Boss07_Player_FireBeam(Boss07* this, PlayState* play);
+void Boss07_Player_WrathWalkLimb(Boss07* this, s32 limbIndex, Vec3f* pos, Vec3s* rot);
+void Boss07_Player_DrawBust(Boss07* this, PlayState* play);
 s32 Boss07_IsPlayerAttack(Actor* actor);
 
 void Boss07_Wrath_SetupIntroCutscene(Boss07* this, PlayState* play);
@@ -3577,6 +3580,11 @@ s32 Boss07_Wrath_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, V
         rot->z += this->cutsceneHeadRot.z;
     }
 
+    // 2S2H "Play as Majora": Wrath has no walk animation, the player Wrath's walk is added here
+    if (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER) {
+        Boss07_Player_WrathWalkLimb(this, limbIndex, pos, rot);
+    }
+
     return false;
 }
 
@@ -3708,6 +3716,11 @@ void Boss07_Wrath_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
     if (limbIndex == MAJORAS_WRATH_LIMB_RIGHT_FOOT) {
         Matrix_MultZero(&colliderPos);
         Boss07_SetColliderSphere(MAJORAS_WARTH_KICK_COLLIDER_RIGHT_FOOT, &this->kickCollider, &colliderPos);
+    }
+
+    // 2S2H "Play as Majora": the player Wrath's bust, on the torso
+    if ((limbIndex == MAJORAS_WRATH_LIMB_TORSO) && (MAJORA_GET_TYPE(&this->actor) == MAJORA_TYPE_PLAYER)) {
+        Boss07_Player_DrawBust(this, play);
     }
 }
 
@@ -6685,7 +6698,8 @@ void Boss07_Mask_DrawBeam(Boss07* this, PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    if (this->actionFunc == Boss07_Mask_FireBeam) {
+    // 2S2H "Play as Majora": the player mask's beam too
+    if ((this->actionFunc == Boss07_Mask_FireBeam) || (this->actionFunc == Boss07_Player_FireBeam)) {
         gSPSegment(POLY_XLU_DISP++, 0x0C,
                    Gfx_TexScrollEx(play->state.gfxCtx, 0, (this->frameCounter * -15) & 0xFF, 32, 64, 0, -15));
         gDPPipeSync(POLY_XLU_DISP++);
