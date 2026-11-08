@@ -496,7 +496,7 @@ typedef enum {
 
 typedef enum ActorId {
     #include "tables/actor_table.h"
-    /* 0x2B2 */ ACTOR_ID_MAX // originally "ACTOR_DLF_MAX"
+    /* 0x2B3 */ ACTOR_ID_MAX // originally "ACTOR_DLF_MAX" (2S2H: + Player_Gdf)
 } ActorId;
 
 #undef DEFINE_ACTOR

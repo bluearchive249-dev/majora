@@ -25,6 +25,9 @@
 #include <fast/Fast3dWindow.h>
 
 extern "C" {
+// Play as Ganondorf (PlayAsGanondorf.cpp)
+int32_t PlayAsGanondorf_AssetsReady(void);
+void PlayAsGanondorf_RetryAssets(void);
 #include "z64.h"
 #include "functions.h"
 #include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
@@ -1288,6 +1291,30 @@ void BenMenu::AddEnhancements() {
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0); })
         .Options(FloatSliderOptions().Min(15.0f).Max(120.0f).Step(1.0f).DefaultValue(45.0f).Format("%.0f").Tooltip(
             "How high the mask floats above the ground."));
+    AddWidget(path, "Play as Ganondorf", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsGanondorf.Enabled")
+        .Options(CheckboxOptions().Tooltip(
+            "Replaces Link with Ganondorf from Ocarina of Time.\n\n"
+            "Needs Ship of Harkinian's oot.o2r (made from your own Ocarina of Time ROM): copy it into this folder, "
+            "next to mm.o2r. Not into the mods folder. Ganondorf's model and animations are read from it.\n\n"
+            "First step of the port: he stands, idles and floats while moving. His walk, moves, magic, cape and "
+            "trident come next.\n"
+            "Link is shown in his other forms, in first person, in crawlspaces and in cutscenes."));
+    AddWidget(path, "oot.o2r not found: Ganondorf can't be shown. Copy it next to mm.o2r.", WIDGET_TEXT)
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0) || PlayAsGanondorf_AssetsReady();
+        });
+    AddWidget(path, "Look for oot.o2r Again", WIDGET_BUTTON)
+        .PreFunc([](WidgetInfo& info) {
+            info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0) || PlayAsGanondorf_AssetsReady();
+        })
+        .Callback([](WidgetInfo& info) { PlayAsGanondorf_RetryAssets(); })
+        .Options(ButtonOptions().Tooltip("After copying oot.o2r into this folder."));
+    AddWidget(path, "Ganondorf: Show Link in Cutscenes", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsGanondorf.ShowLinkInCutscenes")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Story cutscenes animate Link: show him in them instead of Ganondorf."));
     AddWidget(path, "Hyrule Warriors Styled Link", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.HyruleWarriorsStyledLink")
         .Options(CheckboxOptions().Tooltip(
