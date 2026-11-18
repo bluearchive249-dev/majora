@@ -7366,6 +7366,107 @@ static void BossGanon_Player_UpdateGrabbed(BossGanon* this, PlayState* play) {
 static void BossGanon_Player_PlaceLedgeClimb(BossGanon* this, PlayState* play) {
 }
 
+// Play as Ganondorf (2S2H): from the part of the file around the Gerudo intro
+void BossGanon_Player_Climb(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_DrawIntroProps(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+static void BossGanon_Player_DrawOrgan(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_GrabThrow(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_Laugh(BossGanon* this, PlayState* play) {
+    SkelAnime_Update(&this->skelAnime);
+
+    BossGanon_Player_KeepFloatRoot(this);
+
+    this->legSwayEnabled = true;
+    sCape->backPush = -3.0f;
+    sCape->backSwayMagnitude = 0.25f;
+    sCape->sideSwayMagnitude = -3.0f;
+    sCape->minDist = 20.0f;
+
+    // Keep facing the same way
+    this->actor.yawTowardsPlayer = this->actor.shape.rot.y;
+
+    if ((this->unk_1C2 == 0) && Animation_OnFrame(&this->skelAnime, this->fwork[GDF_FWORK_1])) {
+        Animation_MorphToLoop(&this->skelAnime, &gGanondorfRaiseHandLoopAnim, -5.0f);
+        this->unk_1C2 = 1;
+    }
+
+    if (this->timers[0] == 60) {
+        Audio_PlayActorSound2(&this->actor, NA_SE_EV_TRIFORCE_MARK);
+    }
+
+    if (this->timers[0] < 62) {
+        Math_ApproachF(&this->fwork[GDF_TRIFORCE_PRIM_A], 255.0f, 1.0f, 10.0f);
+        Math_ApproachF(&this->fwork[GDF_TRIFORCE_SCALE], 0.6f, 1.0f, 0.3f);
+        Math_ApproachF(&this->fwork[GDF_TRIFORCE_PRIM_B], 170.0f, 1.0f, 2.55f);
+        Math_ApproachF(&this->fwork[GDF_TRIFORCE_ENV_G], 200.0f, 1.0f, 3.0f);
+    }
+
+    if (this->timers[0] == 0) {
+        BossGanon_Player_SetupFloat(this, play);
+    }
+}
+
+void BossGanon_Player_LedgeClimb(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_SetupLaugh(BossGanon* this, PlayState* play) {
+    BossGanon_SetAnimationObject(this, play, OBJECT_GANON_ANIME2);
+    this->fwork[GDF_FWORK_1] = Animation_GetLastFrame(&gGanondorfRaiseHandStartAnim);
+    Animation_MorphToPlayOnce(&this->skelAnime, &gGanondorfRaiseHandStartAnim, -5.0f);
+    this->actionFunc = BossGanon_Player_Laugh;
+    this->unk_1C2 = 0;
+    this->timers[0] = 75;
+    this->handLightBallScale = 0.0f;
+    this->playerBtnHeld = 0;
+    this->triforceType = GDF_TRIFORCE_DORF;
+
+    if (this->fwork[GDF_TRIFORCE_PRIM_A] <= 0.0f) {
+        this->fwork[GDF_TRIFORCE_SCALE] = 10.0f;
+        this->fwork[GDF_TRIFORCE_PRIM_B] = 255.0f;
+        this->fwork[GDF_TRIFORCE_ENV_G] = 100.0f;
+    }
+
+    Audio_PlayActorSound2(&this->actor, BossGanon_Player_Voice(NA_SE_EN_GANON_LAUGH));
+}
+
+void BossGanon_Player_SetupLedgeClimb(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_SetupOrgan(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_StopOrganMusic(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_TridentSpin(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+void BossGanon_Player_TridentThrow(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+}
+
+s32 BossGanon_Player_TryGrab(BossGanon* this, PlayState* play) {
+    // Play as Ganondorf (2S2H): not ported yet
+    return 0;
+}
+
 // The fireball ring's balls burn: flames licking up and trailing off them
 static void BossGanon_FireballFlames(PlayState* play, Vec3f* pos, s16 frame) {
     Vec3f vel = { 0.0f, 1.5f, 0.0f };

@@ -7,6 +7,10 @@
 
 #include "global.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // ------------------------------------------------------------------------------------------------
 // Link (Player)
 // ------------------------------------------------------------------------------------------------
@@ -74,6 +78,7 @@
 #define NA_SE_EV_GANON_MANTLE NA_SE_EV_WIND_TRAP
 #define NA_SE_EN_FANTOM_FLOAT NA_SE_EN_LAST1_FLOAT_OLD
 #define NA_SE_EN_FANTOM_THUNDER NA_SE_EN_COMMON_THUNDER
+#define NA_SE_EV_TRIFORCE_MARK NA_SE_EV_TRIFORCE
 #define NA_SE_EN_FANTOM_LAUGH NA_SE_EN_GANON_LAUGH
 #define NA_SE_EN_FANTOM_DAMAGE2 NA_SE_EN_FANTOM_DAMAGE
 #define NA_SE_EN_FANTOM_SPARK NA_SE_EN_GANON_SPARK
