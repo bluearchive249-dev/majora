@@ -51,9 +51,11 @@ TriNorm D_801EE188;
  */
 // 2S2H "Play as Majora" (ovl_Boss_07). Majora's attacks carry every damage type at once and go through every defense.
 s32 Boss07_IsPlayerAttack(Actor* actor);
+// 2S2H "Play as Ganondorf" (ovl_Player_Gdf): his attacks too
+s32 BossGanon_IsPlayerAttack(Actor* actor);
 
 static s32 CollisionCheck_IsPiercing(Collider* atCol) {
-    return (atCol != NULL) && Boss07_IsPlayerAttack(atCol->actor);
+    return (atCol != NULL) && (Boss07_IsPlayerAttack(atCol->actor) || BossGanon_IsPlayerAttack(atCol->actor));
 }
 
 /**

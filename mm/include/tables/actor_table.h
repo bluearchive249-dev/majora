@@ -704,3 +704,4 @@
 /* 0x2B0 */ DEFINE_ACTOR(         Obj_Ending,          ACTOR_OBJ_ENDING,          ALLOCTYPE_NORMAL,    "Obj_Ending",          "Stump/Lighting (credits end)")
 /* 0x2B1 */ DEFINE_ACTOR(         En_Rsn,              ACTOR_EN_RSN,              ALLOCTYPE_NORMAL,    "En_Rsn",              "Bomb Shop Man (credits)")
 /* 0x2B2 */ DEFINE_ACTOR(         Player_Gdf,          ACTOR_PLAYER_GDF,          ALLOCTYPE_NORMAL,    "Player_Gdf",          "Ganondorf (Play as Ganondorf)") // 2S2H
+/* 0x2B3 */ DEFINE_ACTOR(         En_Ganon_Mant,       ACTOR_EN_GANON_MANT,       ALLOCTYPE_NORMAL,    "En_Ganon_Mant",       "Ganondorf's cape (Play as Ganondorf)") // 2S2H

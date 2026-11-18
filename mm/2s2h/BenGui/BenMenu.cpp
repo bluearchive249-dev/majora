@@ -1297,9 +1297,11 @@ void BenMenu::AddEnhancements() {
             "Replaces Link with Ganondorf from Ocarina of Time.\n\n"
             "Needs Ship of Harkinian's oot.o2r (made from your own Ocarina of Time ROM): copy it into this folder, "
             "next to mm.o2r. Not into the mods folder. Ganondorf's model and animations are read from it.\n\n"
-            "First step of the port: he stands, idles and floats while moving. His walk, moves, magic, cape and "
-            "trident come next.\n"
-            "Link is shown in his other forms, in first person, in crawlspaces and in cutscenes."));
+            "B: ball of light (hold to charge). R: block with his cape. R + B: ground pound.\n"
+            "C-Right: Big Magic. C-Down: ground pound. C-Left: ball of light (unless C-buttons are kept).\n"
+            "D-Pad Up: taunt. L: levitate (Z sinks). Hold A: sprint.\n\n"
+            "Link is shown in his other forms, in first person, in crawlspaces and in cutscenes.\n"
+            "Not together with Play as Majora."));
     AddWidget(path, "oot.o2r not found: Ganondorf can't be shown. Copy it next to mm.o2r.", WIDGET_TEXT)
         .PreFunc([](WidgetInfo& info) {
             info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0) || PlayAsGanondorf_AssetsReady();
@@ -1310,6 +1312,10 @@ void BenMenu::AddEnhancements() {
         })
         .Callback([](WidgetInfo& info) { PlayAsGanondorf_RetryAssets(); })
         .Options(ButtonOptions().Tooltip("After copying oot.o2r into this folder."));
+    AddWidget(path, "Ganondorf: Keep C-Button Items", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsGanondorf.KeepItems")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(CheckboxOptions().Tooltip("Link's C-button items stay usable; his magic is on B and R only."));
     AddWidget(path, "Ganondorf: Show Link in Cutscenes", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsGanondorf.ShowLinkInCutscenes")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })

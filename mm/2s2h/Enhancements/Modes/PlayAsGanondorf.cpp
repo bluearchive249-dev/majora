@@ -9,12 +9,14 @@
 // icons and every other file with the same path, and 2Ship refuses archives of another game anyway.
 //
 // Link is still there underneath, like in Play as Majora: he stays invisible and keeps handling walking, collision,
-// doors, ladders, loading zones and the camera, while Ganondorf follows him.
+// doors, ladders, loading zones and the camera, while Ganondorf follows him. Ganondorf himself (his walk, moves,
+// magic and cape) is the Ship of Harkinian mod's code (z_boss_ganon.c), compiled here as ovl_Player_Gdf.
 //
 // This file:
 //  - finds oot.o2r and mounts Ganondorf's files from it (GanondorfArchive),
 //  - spawns Ganondorf next to Link (again after every scene change) and removes him when the option is turned off,
-//  - hides Link and his shadow while Ganondorf is shown.
+//  - hides Link and his shadow while Ganondorf is shown, and takes his buttons for Ganondorf's moves,
+//  - his levitation (L up, Z down) and sprint (hold A), and his run speed.
 
 #include <filesystem>
 #include <spdlog/spdlog.h>
@@ -30,7 +32,12 @@
 
 extern "C" {
 #include "variables.h"
-#include "overlays/actors/ovl_Player_Gdf/z_player_gdf.h"
+
+// ovl_Player_Gdf (its header maps Ocarina of Time names onto Majora's Mask's, so it's kept out of here)
+#define GDF_PARAMS_PLAYER 0x10
+s32 PlayerGdf_IsHidden(Actor* thisx);
+s32 PlayerGdf_CanAct(Actor* thisx);
+s32 BossGanon_Player_IsBusy(Actor* thisx);
 }
 
 #define CVAR_PLAY_AS_GANONDORF(var) "gModes.PlayAsGanondorf." var
@@ -178,23 +185,35 @@ extern "C" void PlayAsGanondorf_RetryAssets(void) {
 // Ganondorf in the game
 // ------------------------------------------------------------------------------------------------
 
-static bool sLinkShadowHidden = false;
+#define GDF_LEVITATE_VERTICAL_SPEED 6.0f
 
-static PlayerGdf* FindPlayerGanondorf(PlayState* play) {
+static bool sLinkShadowHidden = false;
+static bool sSprinting = false; // holding A on the ground: he sprints
+static bool sLevitating = false;
+static bool sSoftLanding = false; // let go of the levitation: no fall damage until Link lands
+static f32 sLevitateY = 0.0f;
+static f32 sLevitateSpeed = 0.0f;
+
+static bool IsEnabled() {
+    // (not together with Play as Majora: one of them replaces Link)
+    return CVAR_ENABLED && !CVarGetInteger("gModes.PlayAsMajora.Enabled", 0);
+}
+
+static Actor* FindPlayerGanondorf(PlayState* play) {
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_MISC].first; actor != NULL; actor = actor->next) {
-        if ((actor->id == ACTOR_PLAYER_GDF) && (actor->update != NULL)) {
-            return (PlayerGdf*)actor;
+        if ((actor->id == ACTOR_PLAYER_GDF) && (actor->params == GDF_PARAMS_PLAYER) && (actor->update != NULL)) {
+            return actor;
         }
     }
     return NULL;
 }
 
 static bool ShouldHideLink(PlayState* play) {
-    if (!CVAR_ENABLED || (play == NULL) || !sGdfAssetsMounted) {
+    if (!IsEnabled() || (play == NULL) || !sGdfAssetsMounted) {
         return false;
     }
-    PlayerGdf* gdf = FindPlayerGanondorf(play);
-    return (gdf != NULL) && !PlayerGdf_IsHidden(&gdf->actor);
+    Actor* gdf = FindPlayerGanondorf(play);
+    return (gdf != NULL) && !PlayerGdf_IsHidden(gdf);
 }
 
 static void SetLinkShadowHidden(Player* player, bool hidden) {
@@ -207,6 +226,138 @@ static void SetLinkShadowHidden(Player* player, bool hidden) {
     }
 }
 
+extern "C" s32 PlayAsGanondorf_KeepItems(void) {
+    return CVarGetInteger(CVAR_PLAY_AS_GANONDORF("KeepItems"), 0);
+}
+
+extern "C" s32 PlayAsGanondorf_IsSprinting(void) {
+    return sSprinting && IsEnabled();
+}
+
+extern "C" s32 PlayAsGanondorf_IsLevitating(void) {
+    return sLevitating;
+}
+
+// Not ported yet: the organ, Ganon and his crawlspace flame
+extern "C" s32 PlayAsGanondorf_UseOrganOcarina(void) {
+    return false;
+}
+
+extern "C" s32 PlayAsGanondorf_OrganButtonPressed(void) {
+    return false;
+}
+
+extern "C" s32 PlayAsGanondorf_IsGanonOut(PlayState* play) {
+    return false;
+}
+
+extern "C" s32 PlayAsGanondorf_IsCrawlFlame(PlayState* play, Player* player) {
+    return false;
+}
+
+static f32 GetRunSpeedFactor() {
+    return CVarGetFloat(CVAR_PLAY_AS_GANONDORF("RunSpeed"), 1.5f) *
+           (sSprinting ? CVarGetFloat(CVAR_PLAY_AS_GANONDORF("SprintSpeed"), 1.5f) : 1.0f);
+}
+
+static void StopLevitating() {
+    if (sLevitating) {
+        sLevitating = false;
+        sSoftLanding = true;
+    }
+}
+
+// L rises, Z sinks, neither hovers in place. The stick moves him like running on the ground. Runs after Link's own
+// update, so it overrides his falling every frame.
+static void UpdateLevitation(PlayState* play, Player* player, Actor* gdf) {
+    Input* input = &play->state.input[0];
+    bool up = CHECK_BTN_ALL(input->cur.button, BTN_L);
+    bool down = CHECK_BTN_ALL(input->cur.button, BTN_Z);
+    bool notAllowed = (player->stateFlags1 &
+                       (PLAYER_STATE1_200000 | PLAYER_STATE1_2000 | PLAYER_STATE1_4 | PLAYER_STATE1_DEAD |
+                        PLAYER_STATE1_20000000 | PLAYER_STATE1_TALKING | PLAYER_STATE1_800000 | PLAYER_STATE1_400 |
+                        PLAYER_STATE1_10000000 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000)) ||
+                      (player->stateFlags2 & PLAYER_STATE2_40000) || PlayerGdf_IsHidden(gdf);
+
+    if (!CVarGetInteger(CVAR_PLAY_AS_GANONDORF("Levitate"), 1)) {
+        notAllowed = true;
+    }
+
+    if (!sLevitating) {
+        if (up && !notAllowed && PlayerGdf_CanAct(gdf)) {
+            sLevitating = true;
+            sSoftLanding = false;
+            sLevitateY = player->actor.world.pos.y;
+            sLevitateSpeed = player->speedXZ;
+        } else {
+            // He floats back down after letting go, no fall damage
+            if (sSoftLanding) {
+                if (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
+                    sSoftLanding = false;
+                } else {
+                    player->fallStartHeight = (s16)player->actor.world.pos.y;
+                    player->fallDistance = 0;
+                }
+            }
+            return;
+        }
+    }
+
+    if (notAllowed) {
+        StopLevitating();
+        return;
+    }
+
+    // Up and down
+    if (up && !down) {
+        sLevitateY += GDF_LEVITATE_VERTICAL_SPEED;
+    } else if (down && !up) {
+        sLevitateY -= GDF_LEVITATE_VERTICAL_SPEED;
+
+        // Landed: Link takes over on the ground again
+        if ((player->actor.floorHeight > BGCHECK_Y_MIN + 1.0f) && (sLevitateY <= player->actor.floorHeight)) {
+            player->actor.world.pos.y = player->actor.floorHeight;
+            player->actor.velocity.y = 0.0f;
+            StopLevitating();
+            return;
+        }
+    }
+
+    // Around, like running: camera-relative stick, as Link on the ground
+    f32 stickMagnitude;
+    s16 stickAngle;
+    Lib_GetControlStickData(&stickMagnitude, &stickAngle, input);
+
+    if (BossGanon_Player_IsBusy(gdf) || (stickMagnitude < 8.0f)) {
+        stickMagnitude = 0.0f;
+    }
+
+    f32 targetSpeed = (stickMagnitude / 60.0f) * 6.0f * GetRunSpeedFactor();
+    Math_StepToF(&sLevitateSpeed, targetSpeed, (targetSpeed > sLevitateSpeed) ? 1.5f : 2.0f);
+
+    if (stickMagnitude > 0.0f) {
+        s16 worldYaw = (s16)(Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)) + stickAngle);
+        Math_ScaledStepToS(&player->actor.shape.rot.y, worldYaw, 0x1800);
+    }
+    player->yaw = player->actor.world.rot.y = player->actor.shape.rot.y;
+
+    player->actor.world.pos.x += Math_SinS(player->actor.shape.rot.y) * sLevitateSpeed;
+    player->actor.world.pos.z += Math_CosS(player->actor.shape.rot.y) * sLevitateSpeed;
+    player->actor.world.pos.y = sLevitateY;
+
+    // Walls and ceilings still stop him
+    Actor_UpdateBgCheckInfo(play, &player->actor, 26.0f, 18.0f, Player_GetHeight(player),
+                            UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
+    sLevitateY = player->actor.world.pos.y;
+
+    // Link's own falling does nothing while levitating
+    player->speedXZ = 0.0f;
+    player->actor.speed = 0.0f;
+    player->actor.velocity.x = player->actor.velocity.y = player->actor.velocity.z = 0.0f;
+    player->fallStartHeight = (s16)player->actor.world.pos.y;
+    player->fallDistance = 0;
+}
+
 // Runs after Link's update every frame, enabled or not, so turning the option off also removes Ganondorf
 static void OnLinkUpdate(Actor* actor) {
     PlayState* play = gPlayState;
@@ -216,22 +367,73 @@ static void OnLinkUpdate(Actor* actor) {
     }
 
     Player* player = (Player*)actor;
-    PlayerGdf* gdf = FindPlayerGanondorf(play);
+    Actor* gdf = FindPlayerGanondorf(play);
 
-    if (!CVAR_ENABLED || !sGdfAssetsMounted || (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
+    if (!IsEnabled() || !sGdfAssetsMounted || (gSaveContext.gameMode != GAMEMODE_NORMAL)) {
         if (gdf != NULL) {
-            Actor_Kill(&gdf->actor);
+            Actor_Kill(gdf);
         }
         SetLinkShadowHidden(player, false);
+        sLevitating = sSoftLanding = false;
         return;
     }
 
     if (gdf == NULL) {
+        // New area: start on the ground
+        sLevitating = sSoftLanding = false;
         Actor_Spawn(&play->actorCtx, play, ACTOR_PLAYER_GDF, player->actor.world.pos.x, player->actor.world.pos.y,
-                    player->actor.world.pos.z, 0, player->actor.shape.rot.y, 0, 0);
+                    player->actor.world.pos.z, 0, player->actor.shape.rot.y, 0, GDF_PARAMS_PLAYER);
+        gdf = FindPlayerGanondorf(play);
+    }
+    if (gdf != NULL) {
+        UpdateLevitation(play, player, gdf);
     }
 
     SetLinkShadowHidden(player, ShouldHideLink(play));
+}
+
+// Link's buttons while Ganondorf is out: B, R, L, Z, D-pad (and the C-buttons, unless kept) are his moves
+static void FilterLinkInput(Input* input) {
+    PlayState* play = gPlayState;
+
+    sSprinting = false;
+    if (!ShouldHideLink(play)) {
+        return;
+    }
+    Actor* gdf = FindPlayerGanondorf(play);
+    Player* player = GET_PLAYER(play);
+    bool busy = BossGanon_Player_IsBusy(gdf);
+
+    // B = his light ball, R = block (R + B the ground pound), L = levitate, D-pad Up = taunt.
+    // Z still locks on (and sinks him while levitating).
+    u16 blocked = BTN_B | BTN_R | BTN_L | BTN_DUP | BTN_DDOWN;
+
+    if (!PlayAsGanondorf_KeepItems()) {
+        blocked |= BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT;
+    }
+
+    // A still opens doors, talks, climbs and grabs, but no rolls, jump attacks or side hops: where it would roll,
+    // holding it makes him sprint
+    u16 doAction = play->interfaceCtx.aButtonDoAction;
+    bool aFree = (doAction == DO_ACTION_NONE) || (doAction == DO_ACTION_ATTACK) || (doAction == DO_ACTION_JUMP) ||
+                 (doAction == DO_ACTION_PUTAWAY);
+
+    sSprinting = CVarGetInteger(CVAR_PLAY_AS_GANONDORF("Sprint"), 1) && !busy && !sLevitating && aFree &&
+                 CHECK_BTN_ALL(input->cur.button, BTN_A) && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND);
+    if (busy || sLevitating || aFree) {
+        blocked |= BTN_A;
+    }
+
+    input->cur.button &= ~blocked;
+    input->press.button &= ~blocked;
+    input->rel.button &= ~blocked;
+
+    // He stays put while he attacks, and levitation does its own movement
+    if (busy || sLevitating) {
+        input->cur.stick_x = input->cur.stick_y = 0;
+        input->rel.stick_x = input->rel.stick_y = 0;
+        input->press.stick_x = input->press.stick_y = 0;
+    }
 }
 
 static void RegisterPlayAsGanondorf() {
@@ -243,6 +445,17 @@ static void RegisterPlayAsGanondorf() {
     COND_ID_HOOK(ShouldActorDraw, ACTOR_PLAYER, CVAR_ENABLED, [](Actor* actor, bool* should) {
         if ((gPlayState != NULL) && (actor == &GET_PLAYER(gPlayState)->actor) && ShouldHideLink(gPlayState)) {
             *should = false;
+        }
+    });
+
+    COND_HOOK(OnPassPlayerInputs, CVAR_ENABLED, FilterLinkInput);
+
+    // His long stride: Link runs faster while Ganondorf is out, more when sprinting
+    COND_VB_SHOULD(VB_SPEED_MODIFIER_WALK, CVAR_ENABLED, {
+        f32* speedTarget = va_arg(args, f32*);
+
+        if (ShouldHideLink(gPlayState)) {
+            *speedTarget *= GetRunSpeedFactor();
         }
     });
 }
