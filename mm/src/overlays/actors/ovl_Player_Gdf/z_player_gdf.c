@@ -2920,8 +2920,7 @@ static f32 sGdfWalkSpeed = 0.0f; // how fast he's walking (this frame's, from Up
 // With the trident: how much of his walk is the plain walk (the rest the trident run), by speed, as the plain walk
 // gives way to the stick run
 static f32 BossGanon_Player_TridentWalkAmount(f32 speed) {
-    // Play as Ganondorf (2S2H): not ported yet
-    return 0;
+    return 1.0f - CLAMP((speed - GDF_MWALK_FULL_SPEED) / (GDF_MWALK_GONE_SPEED - GDF_MWALK_FULL_SPEED), 0.0f, 1.0f);
 }
 
 // In his trident stance (drawn, with a trident chosen): its own walk and run. Out of it (a trident only chosen as his
@@ -4307,20 +4306,68 @@ s32 BossGanon_Player_IsPhantom(void) {
 typedef f32 GdfMat3[3][3];
 
 static void BossGanon_Pg_FromMtxF(MtxF* mf, GdfMat3 out, f32* scale) {
-    // Play as Ganondorf (2S2H): not ported yet
+    s32 r;
+    s32 c;
+    f32 len;
+
+    // MtxF is column major: mf[c][r]
+    for (c = 0; c < 3; c++) {
+        len = sqrtf(SQ(mf->mf[c][0]) + SQ(mf->mf[c][1]) + SQ(mf->mf[c][2]));
+        if (len < 1e-8f) {
+            len = 1.0f;
+        }
+        for (r = 0; r < 3; r++) {
+            out[r][c] = mf->mf[c][r] / len;
+        }
+        if ((c == 0) && (scale != NULL)) {
+            *scale = len;
+        }
+    }
 }
 
 static void BossGanon_Pg_Mul(const GdfMat3 a, const GdfMat3 b, GdfMat3 out, s32 transposeA) {
-    // Play as Ganondorf (2S2H): not ported yet
+    s32 r;
+    s32 c;
+    s32 k;
+
+    for (r = 0; r < 3; r++) {
+        for (c = 0; c < 3; c++) {
+            f32 sum = 0.0f;
+
+            for (k = 0; k < 3; k++) {
+                sum += (transposeA ? a[k][r] : a[r][k]) * b[k][c];
+            }
+            out[r][c] = sum;
+        }
+    }
 }
 
 // R = Rz * Ry * Rx (the skeleton's rotation order)
 static void BossGanon_Pg_FromRot(Vec3s* rot, GdfMat3 out) {
-    // Play as Ganondorf (2S2H): not ported yet
+    f32 cx = Math_CosS(rot->x);
+    f32 sx = Math_SinS(rot->x);
+    f32 cy = Math_CosS(rot->y);
+    f32 sy = Math_SinS(rot->y);
+    f32 cz = Math_CosS(rot->z);
+    f32 sz = Math_SinS(rot->z);
+
+    out[0][0] = cz * cy;
+    out[0][1] = cz * sy * sx - sz * cx;
+    out[0][2] = cz * sy * cx + sz * sx;
+    out[1][0] = sz * cy;
+    out[1][1] = sz * sy * sx + cz * cx;
+    out[1][2] = sz * sy * cx - cz * sx;
+    out[2][0] = -sy;
+    out[2][1] = cy * sx;
+    out[2][2] = cy * cx;
 }
 
 static void BossGanon_Pg_ToRot(GdfMat3 m, Vec3s* rot) {
-    // Play as Ganondorf (2S2H): not ported yet
+    f32 sy = CLAMP(-m[2][0], -1.0f, 1.0f);
+
+    rot->x = (s16)(atan2f(m[2][1], m[2][2]) * (32768.0f / M_PI));
+    rot->y = (s16)(asinf(sy) * (32768.0f / M_PI));
+    rot->z = (s16)(atan2f(m[1][0], m[0][0]) * (32768.0f / M_PI));
 }
 
 // His hair: the running clips pitch his head, and the hair (hanging from it) swung in through the back of his armour's
@@ -7564,6 +7611,10 @@ void BossGanon_Update(Actor* thisx, PlayState* play) {
 }
 
 void BossGanon_Draw(Actor* thisx, PlayState* play) {
+    // (his update can be stopped by a cutscene, which would leave him shown while Link is)
+    if ((thisx->params == GDF_PARAMS_PLAYER) && BossGanon_Player_ShouldHideAnyForm(play)) {
+        return;
+    }
     BossGanon_UsePlayerContext();
     BossGanon_Draw_Impl(thisx, play);
 }

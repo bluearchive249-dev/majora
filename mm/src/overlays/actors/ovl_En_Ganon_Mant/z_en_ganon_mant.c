@@ -659,6 +659,12 @@ void EnGanonMant_Draw(Actor* thisx, PlayState* play) {
     Vec3f midpoint;
     s16 nextStrandIdx;
 
+    // Play as Ganondorf (2S2H): his pieces aren't drawn while Link is shown instead (cutscenes can stop his update,
+    // which would otherwise take the cape's draw away)
+    if (this->ownVertices && BossGanon_Player_ShouldHideAnyForm(play)) {
+        return;
+    }
+
     if (this->isLinked) {
         return; // (sewn onto another cloth, which simulates and draws it)
     }
