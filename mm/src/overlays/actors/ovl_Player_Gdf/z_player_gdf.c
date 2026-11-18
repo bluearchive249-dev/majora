@@ -7467,6 +7467,17 @@ s32 BossGanon_Player_TryGrab(BossGanon* this, PlayState* play) {
     return 0;
 }
 
+// Play as Ganondorf (2S2H): the boss fight's own actions and his item pose aren't in this port; they're only
+// compared against
+void BossGanon_ChargeBigMagic(BossGanon* this, PlayState* play) {
+}
+void BossGanon_PoundFloor(BossGanon* this, PlayState* play) {
+}
+void BossGanon_LightBall_Update(Actor* thisx, PlayState* play) {
+}
+void BossGanon_Player_ItemGet(BossGanon* this, PlayState* play) {
+}
+
 // The fireball ring's balls burn: flames licking up and trailing off them
 static void BossGanon_FireballFlames(PlayState* play, Vec3f* pos, s16 frame) {
     Vec3f vel = { 0.0f, 1.5f, 0.0f };
