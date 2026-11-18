@@ -1272,12 +1272,179 @@ void BossGanon_DrawDarkVortex(BossGanon* this, PlayState* play) {
     }
 }
 
+void func_808E0254(BossGanon* this, u8* tex, f32 arg2) {
+    static s16 D_808E4DF4[] = { 1, 2, 3, 3, 2, 1 };
+    static s16 D_808E4E00[] = { 2, 3, 4, 4, 4, 3, 2 };
+    static s16 D_808E4E10[] = { 2, 3, 4, 4, 4, 4, 3, 2 };
+    static s16 D_808E4E20[] = { 2, 4, 5, 5, 6, 6, 6, 6, 5, 5, 4, 2 };
+    static s16 D_808E4E38[] = { 1, -1, 1, 1, 3, 4, 1, 6, 7, 2, 9, 10, 2, 12, 13 };
+    static u8 D_808E4E58[] = { 3, 2, 2, 1, 3, 3, 1, 3, 3, 1, 0, 3, 1, 0, 3 };
+    s16 baseX;
+    s16 index;
+    s16 i;
+    s16 baseY;
+    s16 x;
+    s16 addY;
+    f32 lerpX;
+    s16 y;
+    f32 lerpY;
+    f32 lerpZ;
+    Vec3f sp68;
+    Vec3f sp5C;
+
+    for (i = 0; i < 15; i++) {
+        if (arg2 == 0.0f || (y = D_808E4E38[i]) >= 0) {
+            if (arg2 > 0.0f) {
+                lerpX = this->unk_2EC[i].x + (this->unk_2EC[y].x - this->unk_2EC[i].x) * arg2;
+                lerpY = this->unk_2EC[i].y + (this->unk_2EC[y].y - this->unk_2EC[i].y) * arg2;
+                lerpZ = this->unk_2EC[i].z + (this->unk_2EC[y].z - this->unk_2EC[i].z) * arg2;
+
+                sp68.x = lerpX - this->actor.world.pos.x;
+                sp68.y = lerpY - this->actor.world.pos.y + 76 + 30 + 30;
+                sp68.z = lerpZ - this->actor.world.pos.z;
+            } else {
+
+                sp68.x = this->unk_2EC[i].x - this->actor.world.pos.x;
+                sp68.y = this->unk_2EC[i].y - this->actor.world.pos.y + 76 + 30 + 30;
+                sp68.z = this->unk_2EC[i].z - this->actor.world.pos.z;
+            }
+            Matrix_MultVec3f(&sp68, &sp5C);
+
+            sp5C.x *= 0.4f;
+            sp5C.y *= 0.4f;
+
+            baseX = (s16)(sp5C.x + 32.0f);
+            baseY = (s16)sp5C.y * 64;
+
+            if (D_808E4E58[i] == 2) {
+                for (y = 0, addY = -0x180; y < 12; y++, addY += 0x40) {
+                    for (x = -D_808E4E20[y]; x < D_808E4E20[y]; x++) {
+                        index = baseX + x + baseY + addY;
+                        if ((index >= 0) && (index < 0x1000)) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            } else if (D_808E4E58[i] == 1) {
+                for (y = 0, addY = -0x100; y < 8; y++, addY += 0x40) {
+                    for (x = -D_808E4E10[y]; x < D_808E4E10[y]; x++) {
+                        index = baseX + x + baseY + addY;
+                        if ((index >= 0) && (index < 0x1000)) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            } else if (D_808E4E58[i] == 0) {
+                for (y = 0, addY = -0xC0; y < 7; y++, addY += 0x40) {
+                    for (x = -D_808E4E00[y]; x < D_808E4E00[y] - 1; x++) {
+                        index = baseX + x + baseY + addY;
+                        if ((index >= 0) && (index < 0x1000)) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            } else {
+                for (y = 0, addY = -0x80; y < 6; y++, addY += 0x40) {
+                    for (x = -D_808E4DF4[y]; x < D_808E4DF4[y] - 1; x++) {
+                        index = baseX + x + baseY + addY;
+                        if ((index >= 0) && (index < 0x1000)) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void BossGanon_GenShadowTexture(u8* tex, BossGanon* this, PlayState* play) {
-    // Play as Ganondorf (2S2H): not ported yet
+    s16 addY;
+    s16 baseX;
+    s16 baseY;
+    s16 i;
+    s16 j;
+    s16 y;
+    s16 x;
+    s16 index;
+    Vec3f sp7C;
+    Vec3f sp70;
+    s32* ptr = (s32*)tex;
+
+    for (i = 0; i < 64 * 64 / 4; i++, ptr++) {
+        *ptr = 0;
+    }
+
+    Matrix_RotateX(1.0f, MTXMODE_NEW);
+
+    for (i = 0; i <= 5; i++) {
+        func_808E0254(this, tex, i / 5.0f);
+    }
+
+    for (i = 0; i < 12; i++) {
+        for (j = 0; j < 12; j++) {
+            sp7C.x = sCape->strands[i].joints[j].x - this->actor.world.pos.x;
+            sp7C.y = sCape->strands[i].joints[j].y - this->actor.world.pos.y + 76.0f + 100.0f + 30.0f;
+            sp7C.z = sCape->strands[i].joints[j].z - this->actor.world.pos.z;
+
+            Matrix_MultVec3f(&sp7C, &sp70);
+
+            sp70.x = sp70.x * 0.28f;
+            sp70.y = sp70.y * 0.28f;
+
+            baseX = (s32)(sp70.x + 32.0f);
+            baseY = (s16)sp70.y * 0x40;
+
+            if (!sCape->strands[i].torn[j]) {
+                for (y = -1, addY = -0x40; y <= 1; y++, addY += 0x40) {
+                    for (x = -3; x <= 3; x++) {
+                        index = baseX + x + baseY + addY;
+                        if (0 <= index && index < 0x1000) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            } else {
+                for (y = -1, addY = -0x40; y <= 1; y++, addY += 0x40) {
+                    for (x = -1; x <= 1; x++) {
+                        index = baseX + x + baseY + addY;
+                        if (0 <= index && index < 0x1000) {
+                            tex[index] = 255;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void BossGanon_DrawShadowTexture(void* tex, BossGanon* this, PlayState* play) {
-    // Play as Ganondorf (2S2H): not ported yet
+    s32 pad;
+    f32 zOffset;
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+
+    OPEN_DISPS(gfxCtx);
+
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 0, 0, 0, 50);
+    gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 0);
+
+    if (this->csState < 100) {
+        zOffset = (((((this->actor.world.pos.y - GDF_FLOOR_Y(this) - 10) + 70.0f) * -5.0f) / 10.0f) + 10.0f);
+        Matrix_Translate(this->actor.world.pos.x, GDF_FLOOR_Y(this) + (GDF_IS_PLAYER(this) ? 1.0f : 0.0f),
+                         this->actor.world.pos.z + zOffset, MTXMODE_NEW);
+    } else {
+        Matrix_Translate(this->actor.world.pos.x, 4102.0f, this->actor.world.pos.z - 20.0f, MTXMODE_NEW);
+    }
+
+    Matrix_Scale(0.95000005f, 1.0f, 0.95000005f, MTXMODE_APPLY);
+    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    gSPDisplayList(POLY_OPA_DISP++, gGanondorfShadowSetupDL);
+    gDPLoadTextureBlock(POLY_OPA_DISP++, tex, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                        G_TX_NOMIRROR | G_TX_CLAMP, 6, 6, G_TX_NOLOD, G_TX_NOLOD);
+    gSPDisplayList(POLY_OPA_DISP++, gGanondorfShadowModelDL);
+    gSPInvalidateTexCache(POLY_OPA_DISP++, tex); // Shadow texture will change every frame, no use keeping it around
+
+    CLOSE_DISPS(gfxCtx);
 }
 
 static void BossGanon_Draw_Impl(Actor* thisx, PlayState* play) {
