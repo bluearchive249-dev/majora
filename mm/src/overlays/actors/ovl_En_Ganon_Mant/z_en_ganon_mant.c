@@ -661,7 +661,8 @@ void EnGanonMant_Draw(Actor* thisx, PlayState* play) {
 
     // Play as Ganondorf (2S2H): his pieces aren't drawn while Link is shown instead (cutscenes can stop his update,
     // which would otherwise take the cape's draw away)
-    if (this->ownVertices && BossGanon_Player_ShouldHideAnyForm(play)) {
+    if (this->ownVertices && (BossGanon_Player_ShouldHideAnyForm(play) ||
+                              ((this->actor.parent != NULL) && PlayerGdf_IsHidden(this->actor.parent)))) {
         return;
     }
 

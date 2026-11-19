@@ -101,6 +101,9 @@ void FrameInterpolation_RecordOpenChild(const void* a, int b);
 // Engine functions by their Ocarina of Time names
 // ------------------------------------------------------------------------------------------------
 
+// Ocarina of Time's atan2 takes (x, y), Majora's Mask's (y, x); 2Ship keeps OoT's as the _XY versions
+#define Math_Atan2S Math_Atan2S_XY
+#define Math_Atan2F Math_Atan2F_XY
 #define Matrix_RotateX Matrix_RotateXF
 #define Matrix_RotateY Matrix_RotateYF
 #define Matrix_RotateZ Matrix_RotateZF
