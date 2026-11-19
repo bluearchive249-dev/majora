@@ -14,7 +14,8 @@
 // for the other players, who hear it from his puppet (see GanondorfInvasion.cpp)
 s32 PlayAsGanondorf_KeepItems(void);
 
-#define Audio_PlayActorSound2 Actor_PlaySfx
+#define Audio_PlayActorSound2 PlayerGdf_PlaySfx
+void PlayerGdf_PlaySfx(Actor* actor, u16 sfxId);
 
 #include <string.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -7523,6 +7524,26 @@ void BossGanon_PoundFloor(BossGanon* this, PlayState* play) {
 void BossGanon_LightBall_Update(Actor* thisx, PlayState* play) {
 }
 void BossGanon_Player_ItemGet(BossGanon* this, PlayState* play) {
+}
+
+// His voice lines from Ocarina of Time (GanondorfVoice.cpp); the rest of his sounds as they are. Without oot.o2r's
+// samples (or with the Voice option off), Majora's Mask stand-ins: Igos du Ikana's voice.
+void PlayerGdf_PlaySfx(Actor* actor, u16 sfxId) {
+    static const u16 sStandIns[GDF_VOICE_MAX] = {
+        NA_SE_EN_BOSU_LAUGH,  NA_SE_EN_BOSU_LAUGH,  NA_SE_EN_BOSU_DAMAGE,     NA_SE_EN_BOSU_DAMAGE,
+        NA_SE_EN_BOSU_ATTACK, NA_SE_EN_BOSU_ATTACK, NA_SE_EN_BOSU_SWORD,      NA_SE_EN_IRONNACK_HIT_GND,
+        NA_SE_EN_BOSU_STAND,  NA_SE_EN_BOSU_SIT,    NA_SE_EN_BOSU_DEAD_VOICE, NA_SE_EN_BOSU_ATTACK,
+    };
+
+    if ((sfxId & 0xFF00) == GDF_VOICE_SFX_BASE) {
+        s32 line = sfxId & 0xFF;
+
+        if ((line < GDF_VOICE_MAX) && !GanondorfVoice_Play(line, &actor->projectedPos)) {
+            Actor_PlaySfx(actor, sStandIns[line]);
+        }
+        return;
+    }
+    Actor_PlaySfx(actor, sfxId);
 }
 
 // The fireball ring's balls burn: flames licking up and trailing off them

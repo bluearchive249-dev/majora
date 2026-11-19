@@ -29,6 +29,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#include "GanondorfVoice.h"
 
 extern "C" {
 #include "variables.h"
@@ -124,6 +125,16 @@ class GanondorfArchive : public Ship::Archive {
         return mInner->LoadFile(it->second);
     }
 
+    // Any file of oot.o2r, listed or not (his voice samples are read from here, not mounted: Majora's Mask's audio
+    // directory is loaded whole at startup)
+    std::shared_ptr<std::vector<char>> LoadOotFile(const std::string& path) {
+        if (mInner == nullptr) {
+            return nullptr;
+        }
+        auto file = mInner->LoadFile(path);
+        return (file != nullptr) ? file->Buffer : nullptr;
+    }
+
   private:
     std::shared_ptr<Ship::O2rArchive> mInner;
 };
@@ -166,6 +177,9 @@ static void MountGanondorfAssets() {
     }
     sGdfAssetsMounted = true;
     sGdfArchivePath = path;
+
+    // His voice lines
+    GanondorfVoice_Load([archive](const std::string& file) { return archive->LoadOotFile(file); });
 }
 
 extern "C" s32 PlayAsGanondorf_AssetsReady(void) {
@@ -470,6 +484,49 @@ static void RegisterPlayAsGanondorf() {
     });
 
     COND_HOOK(OnPassPlayerInputs, CVAR_ENABLED, FilterLinkInput);
+
+    // Link's voice clips become Ganondorf's (the ones he has an equivalent for), the rest are muted
+    COND_VB_SHOULD(VB_LINK_VOICE_PITCH_MULTIPLIER, CVAR_ENABLED, {
+        u16 sfxId = *va_arg(args, u16*);
+        PlayState* play = gPlayState;
+
+        if ((sfxId < NA_SE_VO_LI_SWORD_N) || (sfxId >= NA_SE_VO_LI_SWORD_N + 0x100) || !ShouldHideLink(play) ||
+            !CVarGetInteger(CVAR_PLAY_AS_GANONDORF("Voice"), 1)) {
+            return;
+        }
+        *should = false;
+
+        s32 line = -1;
+        switch (NA_SE_VO_LI_SWORD_N + ((sfxId - NA_SE_VO_LI_SWORD_N) & 0x1F)) {
+            case NA_SE_VO_LI_RELAX: // idling
+                line = GDF_VOICE_CHUCKLE;
+                break;
+            case NA_SE_VO_LI_SWEAT:
+            case NA_SE_VO_LI_BREATH_REST:
+                line = GDF_VOICE_BREATHE;
+                break;
+            case NA_SE_VO_LI_FALL_L: // getting hurt (the hit itself already plays his damage voice)
+            case NA_SE_VO_LI_TAKEN_AWAY:
+                line = GDF_VOICE_HURT2;
+                break;
+            case NA_SE_VO_LI_DOWN:
+                line = GDF_VOICE_DYING;
+                break;
+            case NA_SE_VO_LI_GROAN:
+                line = GDF_VOICE_HURT1;
+                break;
+            case NA_SE_VO_LI_SURPRISE: // effort
+            case NA_SE_VO_LI_MAGIC_ATTACK:
+                line = GDF_VOICE_REBUFF;
+                break;
+            case NA_SE_VO_LI_BREATH_DRINK:
+                line = GDF_VOICE_RECOVER;
+                break;
+        }
+        if (line >= 0) {
+            GanondorfVoice_Play(line, &GET_PLAYER(play)->actor.projectedPos);
+        }
+    });
 
     // His long stride: Link runs faster while Ganondorf is out, more when sprinting
     COND_VB_SHOULD(VB_SPEED_MODIFIER_WALK, CVAR_ENABLED, {

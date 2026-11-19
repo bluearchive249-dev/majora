@@ -798,6 +798,7 @@ uint32_t OTRGlobals::GetInterpolationFPS() {
 extern "C" void OTRMessage_Init();
 extern "C" void AudioMgr_CreateNextAudioBuffer(s16* samples, u32 num_samples);
 extern "C" void AudioPlayer_Play(const uint8_t* buf, uint32_t len);
+extern "C" void GanondorfVoice_Mix(s16* buf, u32 frames);
 extern "C" int AudioPlayer_Buffered(void);
 extern "C" int AudioPlayer_GetDesiredBuffered(void);
 extern "C" void ResourceMgr_LoadDirectory(const char* resName);
@@ -842,6 +843,9 @@ void OTRAudio_Thread() {
             AudioMgr_CreateNextAudioBuffer(audio_buffer + i * (num_audio_samples * NUM_AUDIO_CHANNELS),
                                            num_audio_samples);
         }
+
+        // Play as Ganondorf: his voice lines from Ocarina of Time, mixed in here (GanondorfVoice.cpp)
+        GanondorfVoice_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
 
         AudioPlayer_Play((u8*)audio_buffer,
                          num_audio_samples * (sizeof(int16_t) * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE));

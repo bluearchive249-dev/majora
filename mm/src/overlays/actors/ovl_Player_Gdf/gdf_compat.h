@@ -54,17 +54,22 @@
 #define BUMP_ON ACELEM_ON
 #define BUMP_HOOKABLE ACELEM_HOOKABLE
 
+// His voice lines are Ocarina of Time's own (GanondorfVoice.cpp, read from oot.o2r): these ids stand for them, and
+// PlayerGdf_PlaySfx plays them (or a Majora's Mask stand-in when they can't be)
+#include "2s2h/Enhancements/Modes/GanondorfVoice.h"
+#define GDF_VOICE_SFX_BASE 0x7F00
+#define GDF_VOICE_SFX(line) (GDF_VOICE_SFX_BASE + (line))
+
 // ------------------------------------------------------------------------------------------------
-// Sounds: Majora's Mask has no Ganondorf, so his voice and magic use sounds it does have (Igos du Ikana's voice,
-// Majora's magic) for now
+// Sounds: his magic uses Majora's Mask sounds (Majora's magic, thunder, wind) for now
 // ------------------------------------------------------------------------------------------------
 
-#define NA_SE_EN_GANON_LAUGH NA_SE_EN_BOSU_LAUGH
-#define NA_SE_EN_GANON_DAMAGE1 NA_SE_EN_BOSU_DAMAGE
-#define NA_SE_EN_GANON_DAMAGE2 NA_SE_EN_BOSU_DAMAGE
-#define NA_SE_EN_GANON_THROW NA_SE_EN_BOSU_ATTACK
-#define NA_SE_EN_GANON_THROW_BIG NA_SE_EN_BOSU_ATTACK
-#define NA_SE_EN_GANON_AT_RETURN NA_SE_EN_BOSU_SWORD
+#define NA_SE_EN_GANON_LAUGH GDF_VOICE_SFX(GDF_VOICE_LAUGH)
+#define NA_SE_EN_GANON_DAMAGE1 GDF_VOICE_SFX(GDF_VOICE_HURT1)
+#define NA_SE_EN_GANON_DAMAGE2 GDF_VOICE_SFX(GDF_VOICE_HURT2)
+#define NA_SE_EN_GANON_THROW GDF_VOICE_SFX(GDF_VOICE_ATTACK)
+#define NA_SE_EN_GANON_THROW_BIG GDF_VOICE_SFX(GDF_VOICE_HEAVY_ATTACK)
+#define NA_SE_EN_GANON_AT_RETURN GDF_VOICE_SFX(GDF_VOICE_REBUFF)
 #define NA_SE_EN_GANON_THROW_MASIC NA_SE_EN_LAST2_FIRE_OLD
 #define NA_SE_EN_GANON_CHARGE_MASIC NA_SE_EN_LAST1_BEAM_OLD
 #define NA_SE_EN_GANON_HIT_THUNDER NA_SE_EN_COMMON_THUNDER
@@ -73,7 +78,7 @@
 #define NA_SE_EN_GANON_WAVE_GND NA_SE_EN_LAST3_ROD_HARD
 #define NA_SE_EN_GANON_DARKWAVE NA_SE_EN_LAST1_BEAM_OLD
 #define NA_SE_EN_GANON_BIGMASIC NA_SE_EN_LAST1_BEAM_OLD
-#define NA_SE_EN_GANON_HIT_GND NA_SE_EN_IRONNACK_HIT_GND
+#define NA_SE_EN_GANON_HIT_GND GDF_VOICE_SFX(GDF_VOICE_STRIKE_GROUND)
 #define NA_SE_EN_GANON_HIT_GND_IMP NA_SE_IT_BOMB_EXPLOSION
 #define NA_SE_EV_GANON_MANTLE NA_SE_EV_WIND_TRAP
 #define NA_SE_EN_FANTOM_FLOAT NA_SE_EN_LAST1_FLOAT_OLD

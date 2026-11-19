@@ -1316,6 +1316,16 @@ void BenMenu::AddEnhancements() {
         .CVar("gModes.PlayAsGanondorf.KeepItems")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
         .Options(CheckboxOptions().Tooltip("Link's C-button items stay usable; his magic is on B and R only."));
+    AddWidget(path, "Ganondorf: His Voice", WIDGET_CVAR_CHECKBOX)
+        .CVar("gModes.PlayAsGanondorf.Voice")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "His own voice from Ocarina of Time (read from oot.o2r): his laugh, attacks and grunts, and Link's voice "
+            "clips become his. Off: Majora's Mask stand-ins."));
+    AddWidget(path, "Ganondorf Voice Volume", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsGanondorf.VoiceVolume")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(0.0f).Max(2.0f).DefaultValue(1.0f).IsPercentage());
     AddWidget(path, "Ganondorf Camera Distance", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar("gModes.PlayAsGanondorf.CameraDistance")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
