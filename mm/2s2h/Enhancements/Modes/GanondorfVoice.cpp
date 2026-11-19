@@ -133,7 +133,7 @@ bool ParseSample(const std::vector<char>& file, VoiceSample& sample) {
     const uint8_t* b = (const uint8_t*)file.data();
     size_t n = file.size();
     size_t o = 0x40;
-    auto u32 = [&](size_t at) -> uint32_t {
+    auto readU32 = [&](size_t at) -> uint32_t {
         uint32_t v;
         memcpy(&v, b + at, 4);
         return v;
@@ -143,7 +143,7 @@ bool ParseSample(const std::vector<char>& file, VoiceSample& sample) {
         return false;
     }
     int codec = b[o];
-    uint32_t size = u32(o + 4);
+    uint32_t size = readU32(o + 4);
     o += 8;
     if ((codec != 0 && codec != 3) || (o + size > n)) {
         return false;
@@ -154,13 +154,13 @@ bool ParseSample(const std::vector<char>& file, VoiceSample& sample) {
         return false;
     }
     o += 12;                     // loop start, end, count
-    o += 4 + 2 * (size_t)u32(o); // loop state
+    o += 4 + 2 * (size_t)readU32(o); // loop state
     if (o + 12 > n) {
         return false;
     }
-    int order = (int32_t)u32(o);
-    int npredictors = (int32_t)u32(o + 4);
-    uint32_t bookCount = u32(o + 8);
+    int order = (int32_t)readU32(o);
+    int npredictors = (int32_t)readU32(o + 4);
+    uint32_t bookCount = readU32(o + 8);
     o += 12;
     if (o + 2 * (size_t)bookCount > n) {
         return false;
