@@ -436,6 +436,27 @@ static void FilterLinkInput(Input* input) {
     }
 }
 
+// The camera (z_camera.c) frames the player by his height: Ganondorf's while he's shown. Areas under the open sky use
+// wider camera settings, so they have their own distance. Levitating, he's higher up.
+#define GDF_STANDING_CAMERA_HEIGHT 120.0f
+#define GDF_LEVITATING_CAMERA_HEIGHT 150.0f
+
+extern "C" f32 PlayAsGanondorf_GetCameraHeight(Player* player) {
+    f32 height = Player_GetHeight(player);
+    PlayState* play = gPlayState;
+
+    if ((play == NULL) || (player != GET_PLAYER(play)) || !ShouldHideLink(play)) {
+        return height;
+    }
+
+    bool outdoors = (play->skyboxId == SKYBOX_NORMAL_SKY) && !play->envCtx.skyboxDisabled;
+    f32 distance = outdoors ? CVarGetFloat(CVAR_PLAY_AS_GANONDORF("CameraDistanceOutdoors"), 0.75f)
+                            : CVarGetFloat(CVAR_PLAY_AS_GANONDORF("CameraDistance"), 1.0f);
+    f32 ganondorfHeight = (sLevitating ? GDF_LEVITATING_CAMERA_HEIGHT : GDF_STANDING_CAMERA_HEIGHT) * distance;
+
+    return MAX(height, ganondorfHeight);
+}
+
 static void RegisterPlayAsGanondorf() {
     sLinkShadowHidden = false;
 

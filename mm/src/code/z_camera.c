@@ -56,6 +56,11 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
+// 2S2H "Play as Ganondorf": every camera mode scales its distance and height from the player's height, so the camera
+// asks for Ganondorf's height instead while he's shown (Link's otherwise). PlayAsGanondorf.cpp
+f32 PlayAsGanondorf_GetCameraHeight(Player* player);
+#define Player_GetHeight(player) PlayAsGanondorf_GetCameraHeight(player)
+
 #pragma increment_block_number "n64-us:128"
 
 void func_800DDFE0(Camera* camera);

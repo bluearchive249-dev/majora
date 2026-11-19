@@ -1316,6 +1316,17 @@ void BenMenu::AddEnhancements() {
         .CVar("gModes.PlayAsGanondorf.KeepItems")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
         .Options(CheckboxOptions().Tooltip("Link's C-button items stay usable; his magic is on B and R only."));
+    AddWidget(path, "Ganondorf Camera Distance", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsGanondorf.CameraDistance")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(0.4f).Max(2.0f).DefaultValue(1.0f).IsPercentage().Tooltip(
+            "How far back and high the camera sits, indoors and in places without open sky."));
+    AddWidget(path, "Ganondorf Camera Distance Outdoors", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gModes.PlayAsGanondorf.CameraDistanceOutdoors")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
+        .Options(FloatSliderOptions().Min(0.4f).Max(2.0f).DefaultValue(0.75f).IsPercentage().Tooltip(
+            "The same under the open sky (Clock Town, Termina Field, ...), where the camera already "
+            "sits further back."));
     AddWidget(path, "Ganondorf: Show Link in Cutscenes", WIDGET_CVAR_CHECKBOX)
         .CVar("gModes.PlayAsGanondorf.ShowLinkInCutscenes")
         .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gModes.PlayAsGanondorf.Enabled", 0); })
